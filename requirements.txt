@@ -3,6 +3,7 @@ streamlit
 pandas
 numpy
 yfinance
+fredapi
 statsmodels
 matplotlib
 scipy
