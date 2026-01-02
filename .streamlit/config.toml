@@ -1,3 +1,4 @@
+
 [theme]
 primaryColor = "#FFD700"
 backgroundColor = "#FFFFFF"
@@ -9,11 +10,3 @@ font = "sans serif"
 headless = true
 enableCORS = false
 enableXsrfProtection = false
-maxUploadSize = 200
-
-[client]
-showErrorDetails = true
-toolbarMode = "minimal"
-
-[logger]
-level = "info"
