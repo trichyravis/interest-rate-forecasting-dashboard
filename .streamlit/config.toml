@@ -10,3 +10,8 @@ font = "sans serif"
 headless = true
 enableCORS = false
 enableXsrfProtection = false
+# Add this line to fix the "inotify watch limit" error:
+fileWatcherType = "none" 
+
+[browser]
+gatherUsageStats = false
