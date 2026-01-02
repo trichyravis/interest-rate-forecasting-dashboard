@@ -76,6 +76,8 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. ANALYTICS ENGINE (ARIMA + GARCH)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
 tabs = st.tabs(["📈 Rate Forecast", "🌪️ Volatility (GARCH)", "🧪 Backtesting", "📊 Risk Metrics", "📚 Educational Hub"])
 
 if run_btn:
@@ -117,6 +119,7 @@ if run_btn:
                 # --- Tab 2: Volatility (GARCH) ---
                 with tabs[1]:
                     st.subheader("Annualized Conditional Volatility")
+                    
                     fig_v = go.Figure()
                     fig_v.add_trace(go.Scatter(x=yields.index[-250:], y=ann_vol.tail(250), name="GARCH Vol", line=dict(color="red")))
                     fig_v.update_layout(template="plotly_white")
@@ -147,6 +150,10 @@ if run_btn:
                 # --- Tab 5: Educational Hub ---
                 with tabs[4]:
                     st.header("🎓 The Quantitative Framework")
+                    
+
+[Image of interest rate yield curve]
+
                     
                     st.markdown("""
                     **Stage 1: ARIMA Modeling** Captures the linear momentum and trend components of the yield level.
