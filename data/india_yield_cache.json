@@ -1,1 +1,7 @@
-
+{
+    "timestamp": "2025-01-01T18:00:00.000000",
+    "date": "2025-01-01",
+    "yield": 7.215,
+    "source": "Initial Setup",
+    "status": "success"
+}
