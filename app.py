@@ -84,11 +84,11 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════════════════
 tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ GARCH Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Educational Hub"])
 
-with tabs[0]: # ℹ️ Detailed About & Methodology 
+# --- TAB 0: COMPREHENSIVE ABOUT ---
+with tabs[0]:
     st.header("📖 Institutional Research Methodology")
     st.markdown("""
-    This terminal is a quantitative decision-support system designed to bridge the gap between 
-    academic theory and fixed-income market practice. [cite: 1, 11]
+    This terminal is a quantitative decision-support system designed to bridge the gap between academic theory and institutional practice. It utilizes a **dual-framework approach** to analyze sovereign debt benchmarks.
     """)
     col1, col2 = st.columns(2)
     with col1:
@@ -96,19 +96,19 @@ with tabs[0]: # ℹ️ Detailed About & Methodology
         st.markdown("""
         - **Directional Pathing:** ARIMA methodology to identify momentum and mean-reversion.
         - **Risk Estimation:** GARCH(1,1) to model regime-dependent volatility clustering.
-        - **Tail-Risk:** Calculation of Value-at-Risk (VaR) and Expected Shortfall (ES). [cite: 1, 9]
+        - **Tail-Risk:** Calculation of Value-at-Risk (VaR) and Expected Shortfall (ES).
         """)
     with col2:
         st.subheader("📑 Fundamental Assumptions & Limitations")
         st.markdown("""
         - **Mean Reversion:** Rates gravitate toward a long-term equilibrium level.
         - **Stationarity:** Yields stabilized through first-order differencing ($d=1$).
-        - **Limitations:** Models fail during sudden structural breaks or policy regime changes.
+        - **Limitations:** Models do not account for 'Black Swan' events or sudden structural policy shifts.
         """)
 
+# --- EXECUTION LOGIC ---
 if run_btn:
     data = pd.DataFrame()
-    # 🕒 5-Step Retry Logic (Resilience against YFRateLimitError)
     wait_times = [0, 5, 10, 20, 30, 60] 
     success = False
 
@@ -126,7 +126,7 @@ if run_btn:
             except: continue
 
     if not success or data.empty:
-        st.error("❌ Yahoo Finance Limit Reached. Please wait a few minutes and try again.")
+        st.error("❌ Yahoo Finance Limit Reached. Please try again later.")
     else:
         yields = data['Close'].dropna()
         if isinstance(yields, pd.DataFrame): yields = yields.iloc[:, 0]
@@ -146,9 +146,8 @@ if run_btn:
             with tabs[1]: # 📈 Forecast
                 if show_step:
                     fig_step = go.Figure()
-                    fig_step.add_trace(go.Scatter(x=f_dates, y=arima_fc, mode='lines+markers', line_shape='hv', 
-                                                line=dict(color='#FF4B4B', width=4)))
-                    fig_step.update_layout(template="plotly_dark", title="Step-Wise Yield Forecast", paper_bgcolor='rgba(0,0,0,0)')
+                    fig_step.add_trace(go.Scatter(x=f_dates, y=arima_fc, mode='lines+markers', line_shape='hv', line=dict(color='#FF4B4B', width=4)))
+                    fig_step.update_layout(template="plotly_dark", title="Step-Wise Forecast", paper_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig_step, width='stretch')
                 else:
                     fig_f = go.Figure()
@@ -159,7 +158,7 @@ if run_btn:
 
             with tabs[2]: # 🌪️ GARCH Volatility
                 st.subheader("🌪️ Conditional Volatility (GARCH 1,1)")
-                                fig_v = go.Figure(go.Scatter(x=cond_vol.index, y=cond_vol, line=dict(color='red')))
+                fig_v = go.Figure(go.Scatter(x=cond_vol.index, y=cond_vol, name="Annualized Vol", line=dict(color='red')))
                 fig_v.update_layout(title="Annualized Conditional Volatility (%)", template="plotly_white")
                 st.plotly_chart(fig_v, width='stretch')
 
@@ -180,7 +179,7 @@ if run_btn:
                 fig_resid.update_layout(title="Standardized Residuals (White Noise Check)", template="plotly_white")
                 st.plotly_chart(fig_resid, width='stretch')
 
-            with tabs[5]: # 📊 Metrics (VaR & ES) [cite: 1, 9]
+            with tabs[5]: # 📊 Metrics
                 z_score = stats.norm.ppf(conf_level)
                 var_val = latest_vol * z_score
                 es_val = latest_vol * (stats.norm.pdf(z_score) / (1 - conf_level))
@@ -201,36 +200,25 @@ if run_btn:
                 export_df = pd.DataFrame({"Date": f_dates, "Forecast": arima_fc})
                 st.subheader("📋 Export Terminal")
                 st.dataframe(export_df, width='stretch')
-                st.download_button("📥 Download Forecast (CSV)", export_df.to_csv().encode('utf-8'), "report.csv")
+                st.download_button("📥 Download Forecast (CSV)", export_df.to_csv().encode('utf-8'), "yield_report.csv")
 
         except Exception as e:
             st.error(f"Computation Error: {e}")
 
-# --- 📚 COMPREHENSIVE Q&A HUB [cite: 1-10] ---
+# --- 📚 COMPREHENSIVE Q&A HUB ---
 with tabs[7]:
     st.header("🎓 Quantitative Finance Q&A Hub")
-    st.write("Bridging Academic Theory with Institutional Practice. [cite: 11]")
-
     with st.expander("❓ What is the Box-Jenkins Methodology (ARIMA)?"):
-        st.write("""
-        **Definition:** A systematic 3-stage iterative process (Identification, Estimation, Diagnostics) for fitting ARIMA models.
-                """)
-
+        st.write("A 3-stage iterative process (Identification, Estimation, Diagnostics) for fitting models to interest rate data.")
+        
     with st.expander("❓ How does GARCH model Volatility Clustering?"):
-        st.write("""
-        **Definition:** GARCH captures the empirical phenomenon where high-volatility periods are followed by more high volatility.
-        """)
-
+        st.write("GARCH (Generalized Autoregressive Conditional Heteroskedasticity) models time-varying variance, capturing the fact that large changes follow large changes.")
+        
     with st.expander("❓ Explain Stochastic Models: Vasicek vs CIR?"):
-        st.write("""
-        **Vasicek:** Assumes mean reversion but allows technically negative rates.
-        **CIR:** Ensures rates stay positive as volatility is proportional to the square root of the rate level.
-        """)
-
-    with st.expander("❓ What is the Nelson-Siegel Model for Yield Curves?"):
-        st.write("""
-        **Definition:** Industry workhorse fitting yield curves using Level, Slope, and Curvature factors.
-                """)
+        st.write("Vasicek assumes mean reversion but allows negative rates. CIR ensures rates stay positive by making volatility proportional to the square root of the rate level.")
+    with st.expander("❓ What is the Nelson-Siegel Model?"):
+        st.write("A factor model fitting the yield curve using Level, Slope, and Curvature.")
+        
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional US Edition</p>", unsafe_allow_html=True)
