@@ -16,7 +16,7 @@ st.set_page_config(page_title="US Treasury Analytics Terminal", layout="wide")
 DARK_BLUE = "#003366"
 GOLD = "#FFD700"
 
-# Professional CSS Injection
+# Professional Branding CSS
 st.markdown(f"""
     <style>
     .main-header {{
@@ -33,7 +33,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. SIDEBAR - US TICKER SELECTION
+# 2. SIDEBAR CONTROLS
 # ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.header("🇺🇸 Treasury Benchmarks")
@@ -55,29 +55,30 @@ with st.sidebar:
     st.info("Institutional Grade Data provided via Yahoo Finance API.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. CORE ANALYTICS ENGINE
+# 3. CORE ANALYTICS ENGINE (BOX-JENKINS METHODOLOGY)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
 tabs = st.tabs(["📈 Forecast View", "📊 Yield Metrics", "📚 Educational Hub"])
 
 if run_btn:
-    with st.spinner(f"Fetching data for {ticker}..."):
+    with st.spinner(f"Accessing Global Bond Market Data for {ticker}..."):
         # Fetch Data
         end_date = datetime.now()
         start_date = end_date - timedelta(days=lookback_years*365)
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)
 
         if not data.empty:
-            # Handle multi-index if yfinance returns it
+            # Clean and Resample Data
             if isinstance(data.columns, pd.MultiIndex):
                 series = data['Close'][ticker].dropna()
             else:
                 series = data['Close'].dropna()
             
-            # Resample to Business Days
             series = series.resample('B').last().ffill()
 
-            # --- Box-Jenkins ARIMA Process ---
             try:
+                # Execution of ARIMA Model
                 if model_type == "Auto-ARIMA (Optimized)":
                     model = pm.auto_arima(series, seasonal=False, suppress_warnings=True)
                     forecast = model.predict(n_periods=forecast_horizon)
@@ -90,16 +91,16 @@ if run_btn:
                 # --- Tab 1: Visualization ---
                 with tabs[0]:
                     fig = go.Figure()
-                    # Plot recent history (last 1 year for clarity)
+                    # Historical Line (Recent 1 Year)
                     recent_hist = series.tail(252)
                     fig.add_trace(go.Scatter(x=recent_hist.index, y=recent_hist, name="Historical Yield", line=dict(color=DARK_BLUE, width=2)))
                     
-                    # Forecast line
+                    # Forecast Projection
                     f_dates = pd.date_range(series.index[-1], periods=forecast_horizon+1, freq='B')[1:]
                     fig.add_trace(go.Scatter(x=f_dates, y=forecast, name="Predicted Trend", line=dict(color="orange", width=4, dash='dot')))
                     
                     fig.update_layout(
-                        title=f"{ticker_label} - ARIMA {order} Model",
+                        title=f"{ticker_label} - ARIMA {order} Projection",
                         xaxis_title="Date", yaxis_title="Yield (%)",
                         hovermode="x unified", height=500
                     )
@@ -117,8 +118,8 @@ if run_btn:
                     c3.metric("BPS Shift", f"{bps_change:+.1f} bps", delta_color="inverse")
                     
                     st.markdown("### Model Diagnostics")
-                    st.write(f"**Optimal Order:** {order}")
-                    st.write(f"**Data Points Analyzed:** {len(series)}")
+                    st.write(f"**Optimal Order:** ARIMA{order}")
+                    st.write(f"**Data Range:** {start_date.date()} to {end_date.date()}")
 
             except Exception as e:
                 st.error(f"Modeling Error: {e}")
@@ -129,15 +130,15 @@ if run_btn:
 # 4. EDUCATIONAL HUB
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[2]:
-    st.header("🎓 Learning: US Treasury Forecasting")
+    st.header("🎓 Learning: The US Yield Curve")
+    
     st.write("""
-    Forecasting the US Treasury yield curve is the cornerstone of global macro strategy. 
-    By using the **Box-Jenkins (ARIMA) methodology**, we identify:
-    * **Autoregression (p):** How past yields influence the present.
-    * **Integration (d):** The trend stability of the yield levels.
-    * **Moving Average (q):** The impact of recent market 'shocks'.
+    The US Treasury yield curve is the benchmark for global asset pricing. Using the **Box-Jenkins methodology**, 
+    this dashboard forecasts future rates based on:
+    * **Stationarity:** Ensuring data mean and variance are stable over time.
+    * **Parameterization:** Finding the optimal balance between past values (AR) and shocks (MA).
     """)
-    st.info("💡 Refer to the **ARIMA Modeling Guide PDF** in your project folder for deep-dive mathematical explanations.")
+    st.info("💡 Refer to your uploaded 'Final Version ARIMA_Modeling.pdf' for a deep dive into the 6 stages of time-series modeling.")
 
 st.markdown("---")
-st.markdown(f"<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Prof. V. Ravichandran</p>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional Version</p>", unsafe_allow_html=True)
