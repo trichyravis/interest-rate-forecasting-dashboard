@@ -50,10 +50,13 @@ with st.sidebar:
     lookback = st.slider("Lookback (Years)", 1, 10, 5)
     horizon = st.slider("Forecast Horizon (Days)", 5, 60, 20)
     
+    st.header("🎨 Display Settings")
+    show_step = st.checkbox("Show Step-Wise Curve", value=True)
+    
     run_btn = st.button("🚀 EXECUTE QUANT ANALYSIS", use_container_width=True)
 
-    # Spacer to push profile to bottom
-    for _ in range(15):
+    # Spacer loop to push profile to bottom
+    for _ in range(12):
         st.write("")
         
     st.markdown(f"""
@@ -61,7 +64,7 @@ with st.sidebar:
             <h3 style="color: {DARK_BLUE}; margin: 0;">Prof. V. Ravichandran</h3>
             <p style="color: gray; font-size: 0.85rem; margin: 5px 0;">28+ Years Finance Experience</p>
             <hr style="margin: 10px 0;">
-            <a href="https://www.linkedin.com/in/trichyravis" target="_blank">
+            <a href="https://www.linkedin.com/in/trichyravis" target="_blank" style="text-decoration: none;">
                 <button style="background-color: #0077b5; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">LinkedIn Profile</button>
             </a>
         </div>
@@ -74,7 +77,6 @@ tabs = st.tabs(["📈 Forecast View", "🧪 Backtesting", "📊 Yield Metrics", 
 
 if run_btn:
     with st.spinner("Accessing Institutional Feeds..."):
-        # Stable US Data Fetching
         data = yf.download(ticker, period=f"{lookback}y", interval="1d", progress=False)
         
         if not data.empty:
@@ -87,15 +89,28 @@ if run_btn:
                 model_arima = pm.auto_arima(yields, seasonal=False, suppress_warnings=True)
                 arima_fc = model_arima.predict(n_periods=horizon)
                 order = model_arima.order
+                f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
 
                 # TAB 1: Forecast View
                 with tabs[0]:
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Historical Yield", line=dict(color=DARK_BLUE)))
-                    f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
-                    fig.add_trace(go.Scatter(x=f_dates, y=arima_fc, name=f"ARIMA{order} Forecast", line=dict(color="orange", dash='dot', width=3)))
-                    fig.update_layout(title=f"{ticker_label} Projection Path", template="plotly_white", hovermode="x unified")
-                    st.plotly_chart(fig, use_container_width=True)
+                    if show_step:
+                        st.subheader("📡 Institutional Step-Wise Forecast")
+                        fig_step = go.Figure()
+                        fig_step.add_trace(go.Scatter(
+                            x=f_dates, y=arima_fc, mode='lines+markers+text',
+                            line_shape='hv', line=dict(color='#FF4B4B', width=4),
+                            marker=dict(size=8, color='white', line=dict(width=2, color='#FF4B4B')),
+                            text=[f"{v:.2f}%" for v in arima_fc], textposition="top center", name="Rate Steps"
+                        ))
+                        fig_step.update_layout(plot_bgcolor='rgba(10, 25, 47, 1)', paper_bgcolor='rgba(0,0,0,0)',
+                                              font=dict(color="white"), height=450, template="plotly_dark")
+                        st.plotly_chart(fig_step, use_container_width=True)
+                    else:
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Historical Yield", line=dict(color=DARK_BLUE)))
+                        fig.add_trace(go.Scatter(x=f_dates, y=arima_fc, name=f"ARIMA{order} Forecast", line=dict(color="orange", dash='dot', width=3)))
+                        fig.update_layout(title=f"{ticker_label} Projection Path", template="plotly_white", hovermode="x unified")
+                        st.plotly_chart(fig, use_container_width=True)
 
                 # TAB 2: Backtesting
                 with tabs[1]:
@@ -109,9 +124,7 @@ if run_btn:
                     fig_bt.add_trace(go.Scatter(x=test.index, y=bt_forecast, name="Model Prediction", line=dict(color="gray", dash='dash')))
                     fig_bt.update_layout(template="plotly_white")
                     st.plotly_chart(fig_bt, use_container_width=True)
-                    
-                    mae = np.mean(np.abs(test.values - bt_forecast.values))
-                    st.success(f"**Mean Absolute Error (MAE):** {mae:.4f}")
+                    st.success(f"**Mean Absolute Error (MAE):** {np.mean(np.abs(test.values - bt_forecast.values)):.4f}")
 
                 # TAB 3: Yield Metrics
                 with tabs[2]:
@@ -121,23 +134,17 @@ if run_btn:
                     c1.metric("Current Spot Rate", f"{curr:.3f}%")
                     c2.metric("Term Forecast", f"{pred:.3f}%")
                     c3.metric("BPS Shift", f"{(pred-curr)*100:+.1f} bps", delta_color="inverse")
-                    
-                    st.markdown("### Model Diagnostics")
-                    st.write(f"**Optimal Order identified by Auto-ARIMA:** {order}")
+                    st.info(f"💡 Optimal Model identified: ARIMA{order}")
 
                 # TAB 4: Educational Hub
                 with tabs[3]:
-                    st.header("🎓 Understanding ARIMA & Box-Jenkins")
+                    st.header("🎓 Box-Jenkins & Interest Rate Curves")
                     st.markdown("""
-                    The **Box-Jenkins methodology** is a mathematical framework for finding the best-fit 
-                    time series model for forecasting. It consists of three primary stages:
-                    
-                    1. **Identification**: Checking for stationarity (constant mean and variance).
-                    2. **Estimation**: Finding the optimal $p, d, q$ parameters.
-                    3. **Diagnostic Checking**: Ensuring the residuals (errors) are "White Noise."
+                    **The Step Curve Visualization:** In institutional finance, interest rates are often viewed as 'steps' because 
+                    central banks change rates in specific increments (e.g., 25bps). The horizontal-vertical (hv) line shape 
+                    captures this discrete nature of policy movement.
                     """)
                     
-                    st.info("💡 Tip: In interest rate modeling, the 'Integrated' (d) component often accounts for the non-stationary 'trend' in yield movements.")
 
             except Exception as e:
                 st.error(f"Computation Error: {e}")
