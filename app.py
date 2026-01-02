@@ -10,14 +10,13 @@ from statsmodels.tsa.arima.model import ARIMA
 from arch import arch_model 
 import scipy.stats as stats
 import warnings
-import time
 
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. PAGE CONFIG & THEME
+# 1. PAGE CONFIG & INSTITUTIONAL THEME
 # ═══════════════════════════════════════════════════════════════════════════════
-st.set_page_config(page_title="Institutional Risk & Yield Terminal", layout="wide")
+st.set_page_config(page_title="Interest Rate Forecasting Dashboard", layout="wide")
 
 CORPORATE_BLUE = "#002147" 
 GOLD = "#FFD700"
@@ -30,23 +29,30 @@ st.markdown(f"""
         margin-bottom: 2rem; border-bottom: 5px solid {GOLD};
     }}
     [data-testid="stSidebar"] {{ background-color: {CORPORATE_BLUE} !important; color: white !important; }}
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {{ color: white !important; }}
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] h2 {{ color: white !important; }}
+    
     div.stButton > button:first-child {{
         background-color: {GOLD} !important;
         color: {CORPORATE_BLUE} !important;
         font-weight: bold !important;
         width: 100%; border-radius: 8px;
     }}
-    .stTabs [aria-selected="true"] {{ background-color: {GOLD} !important; font-weight: bold; color: {CORPORATE_BLUE} !important; }}
+    
+    .stTabs [data-baseweb="tab-list"] {{ gap: 12px; }}
+    .stTabs [data-baseweb="tab"] {{
+        background-color: #f0f2f6; border-radius: 5px 5px 0 0; padding: 10px 15px; color: {CORPORATE_BLUE};
+    }}
+    .stTabs [aria-selected="true"] {{ background-color: {GOLD} !important; font-weight: bold; }}
     </style>
+    
     <div class="main-header">
         <h1>INTEREST RATE FORECASTING DASHBOARD</h1>
-        <p>The Mountain Path - World of Finance | Institutional Risk & Yield Analytics</p>
+        <p>The Mountain Path - World of Finance | Institutional Research Terminal</p>
     </div>
 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. SIDEBAR
+# 2. SIDEBAR - PROFILE AT BOTTOM
 # ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.header("⚙️ Configuration")
@@ -60,11 +66,12 @@ with st.sidebar:
     
     run_btn = st.button("🚀 EXECUTE QUANT ANALYSIS")
 
-    for _ in range(8): st.write("")
+    for _ in range(10): st.write("")
         
     st.markdown(f"""
         <div style="text-align: center; padding: 15px; border-radius: 10px; background-color: rgba(255,255,255,0.15); border: 1px solid {GOLD};">
             <h3 style="color: white !important; margin: 0;">Prof. V. Ravichandran</h3>
+            <p style="color: #ffffff !important; font-size: 0.85rem; margin: 5px 0;">28+ Years Finance Experience</p>
             <hr style="margin: 10px 0; border-color: {GOLD};">
             <a href="https://www.linkedin.com/in/trichyravis" target="_blank" style="text-decoration: none;">
                 <button style="background-color: #0077b5; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">🔗 LinkedIn Profile</button>
@@ -73,43 +80,33 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. ANALYTICS ENGINE & TABS
+# 3. DASHBOARD INTERFACE
 # ═══════════════════════════════════════════════════════════════════════════════
-tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ GARCH Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Education"])
+tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Education"])
 
-# POPULATE ABOUT TAB IMMEDIATELY
-with tabs[0]:
+with tabs[0]: 
     st.header("📖 Institutional Methodology")
-    st.write("This terminal provides a dual-framework analysis for sovereign debt benchmarks.")
+    st.write("This platform provides a structured quantitative framework for sovereign debt analytics.")
     
-    col_a, col_b = st.columns(2)
-    with col_a:
+    c1, c2 = st.columns(2)
+    with c1:
         st.subheader("🕹️ Operational Guide")
         st.markdown("""
-        1. **Configure Parameters**: Use the sidebar to set history and forecast length.
-        2. **Execute**: The engine will fetch live Treasury data and fit ARIMA/GARCH.
-        3. **Analyze Risk**: Check the Metrics tab for VaR and Expected Shortfall.
+        1. **Configure Parameters**: Set the historical lookback and forecast window in the sidebar.
+        2. **Execute**: The engine fits an ARIMA(p,d,q) for direction and GARCH(1,1) for risk.
+        3. **Analyze**: Review tabs for directional paths, tail-risk (VaR/ES), and diagnostic residuals.
         """)
-    with col_b:
-        st.subheader("📑 Core Assumptions")
+    with c2:
+        st.subheader("📑 Model Assumptions")
         st.markdown("""
-        - **Mean Reversion**: ARIMA assumes rates eventually revert to a local trend.
-        - **Volatility Clustering**: GARCH assumes variance is time-dependent.
-        - **Data Source**: Live feeds provided by Yahoo Finance (Delayed 15m).
+        - **Linearity**: ARIMA assumes future values are linear functions of past data and errors. [cite: 687]
+        - **Volatility Clustering**: GARCH assumes variance is time-dependent and clusters. 
+        - **Mean Reversion**: Rates gravitate toward a long-term equilibrium over time. [cite: 1182]
         """)
 
 if run_btn:
-    with st.spinner("Accessing Institutional Feeds..."):
-        # Rate Limit Resilient Download
-        try:
-            ticker_obj = yf.Ticker(ticker)
-            data = ticker_obj.history(period=f"{lookback}y")
-            if data.empty:
-                # Fallback to standard download if history() fails
-                data = yf.download(ticker, period=f"{lookback}y", progress=False)
-        except Exception:
-            st.error("⚠️ Data connection lost. Yahoo Finance is currently rate-limiting this session. Please wait 1-2 minutes and click 'Execute' again.")
-            st.stop()
+    with st.spinner("Processing Yield & Volatility Engines..."):
+        data = yf.download(ticker, period=f"{lookback}y", progress=False)
         
         if not data.empty:
             yields = data['Close'].dropna()
@@ -118,66 +115,74 @@ if run_btn:
             returns = 100 * yields.pct_change().dropna()
 
             try:
-                # 1. ARIMA & GARCH Fitting
-                model_arima = pm.auto_arima(yields, seasonal=False)
+                # 1. ENGINES
+                model_arima = pm.auto_arima(yields, seasonal=False, suppress_warnings=True)
                 arima_fc = model_arima.predict(n_periods=horizon)
                 f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
-
+                
                 garch_fit = arch_model(returns, p=1, q=1, vol='Garch').fit(disp='off')
                 latest_vol = garch_fit.conditional_volatility.iloc[-1]
                 cond_vol = np.sqrt(garch_fit.conditional_volatility**2 * 252)
-                
-                # 2. VaR & Expected Shortfall
-                z_score = stats.norm.ppf(conf_level)
-                var_val = latest_vol * z_score
-                pdf_z = stats.norm.pdf(z_score)
-                es_val = latest_vol * (pdf_z / (1 - conf_level))
 
+                # 2. TAB POPULATION
                 with tabs[1]: # Forecast
                     fig_f = go.Figure()
-                    fig_f.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="Historical"))
+                    fig_f.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Actual"))
                     fig_f.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA Forecast", line=dict(dash='dot', color='orange')))
-                    fig_f.update_layout(title="Yield Rate Projection", template="plotly_white")
+                    fig_f.update_layout(title=f"{ticker} Forecast Path", template="plotly_white")
                     st.plotly_chart(fig_f, width='stretch')
 
-                with tabs[2]: # GARCH Tab
-                    st.subheader("🌪️ Volatility Clustering (GARCH 1,1)")
+                with tabs[2]: # GARCH
+                    st.subheader("🌪️ Volatility Clustering (GARCH)")
                     fig_vol = go.Figure()
                     fig_vol.add_trace(go.Scatter(x=cond_vol.index, y=cond_vol, name="Ann. Volatility", line=dict(color='red')))
                     st.plotly_chart(fig_vol, width='stretch')
+
+                with tabs[3]: # Backtesting
+                    st.subheader("🧪 30-Day Walk-Forward Validation")
+                    train_bt, test_bt = yields.iloc[:-30], yields.iloc[-30:]
+                    bt_model = pm.auto_arima(train_bt, seasonal=False)
+                    bt_fc = bt_model.predict(n_periods=30)
+                    fig_bt = go.Figure()
+                    fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Realized"))
+                    fig_bt.add_trace(go.Scatter(x=test_bt.index, y=bt_fc, name="Predicted", line=dict(dash='dash', color='orange')))
+                    st.plotly_chart(fig_bt, width='stretch')
+
+                with tabs[4]: # Diagnostics
+                    st.subheader("🔍 ARIMA Residual Diagnostics")
+                    resid = model_arima.resid()
+                    fig_resid = go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray')))
+                    fig_resid.update_layout(title="Standardized Residuals (White Noise Check)", template="plotly_white")
+                    st.plotly_chart(fig_resid, width='stretch')
+                    st.info("💡 Goal: Residuals should be random with zero mean and constant variance. [cite: 676]")
+
+                with tabs[5]: # Metrics
+                    z_score = stats.norm.ppf(conf_level)
+                    var_val = latest_vol * z_score
+                    es_val = latest_vol * (stats.norm.pdf(z_score) / (1 - conf_level))
                     
-                with tabs[5]: # Metrics Tab
-                    st.subheader(f"📊 Market Risk Summary (α = {conf_level*100:.0f}%)")
                     c1, c2, c3, c4 = st.columns(4)
                     c1.metric("Current Rate", f"{yields.iloc[-1]:.3f}%")
-                    c2.metric("Forecasted Rate", f"{arima_fc.iloc[-1]:.3f}%")
-                    c3.metric("Value-at-Risk (VaR)", f"{var_val:.3f}%")
-                    c4.metric("Expected Shortfall", f"{es_val:.3f}%")
-
-                    x = np.linspace(-5, 5, 200)
-                    y = stats.norm.pdf(x, 0, 1)
-                    fig_risk = go.Figure()
-                    fig_risk.add_trace(go.Scatter(x=x, y=y, fill='tozeroy', name='Normal Dist', line=dict(color=CORPORATE_BLUE)))
-                    mask_var = x < -z_score
-                    fig_risk.add_trace(go.Scatter(x=x[mask_var], y=y[mask_var], fill='tozeroy', fillcolor='rgba(255, 0, 0, 0.4)', name='Tail Risk'))
-                    fig_risk.update_layout(title="Risk Zone: Probability of Extreme Moves", template="plotly_white")
-                    st.plotly_chart(fig_risk, width='stretch')
+                    c2.metric("Forecasted", f"{arima_fc.iloc[-1]:.3f}%")
+                    c3.metric("VaR (Daily)", f"{var_val:.3f}%")
+                    c4.metric("Exp. Shortfall", f"{es_val:.3f}%")
 
                 with tabs[6]: # Export
                     export_df = pd.DataFrame({"Date": f_dates, "Forecast": arima_fc})
                     st.dataframe(export_df, width='stretch')
-                    st.download_button("Download CSV", export_df.to_csv().encode('utf-8'), "forecast.csv")
+                    st.download_button("Download CSV", export_df.to_csv().encode('utf-8'), "forecast_report.csv")
 
                 with tabs[7]: # Education
-                    st.header("🎓 The Quantitative Edge")
+                    st.header("🎓 Quantitative Theory")
+                    with st.expander("1. Univariate Models (ARIMA & GARCH)"):
+                        st.write("ARIMA captures momentum and trends [cite: 678], while GARCH captures volatility clustering. ")
+                    with st.expander("2. Stochastic Models (Vasicek & CIR)"):
+                        st.write("Vasicek incorporates mean reversion [cite: 764], while CIR ensures rates never drop below zero. [cite: 806]")
+                    with st.expander("3. Factor Models (Nelson-Siegel)"):
+                        st.write("Explains the curve using Level, Slope, and Curvature factors. [cite: 846, 854]")
                     
-                    st.markdown("""
-                    **Expected Shortfall (ES)** is superior to VaR because it tells us the average magnitude of a loss *given that* the loss threshold has been exceeded.
-                    """)
-                    
-
             except Exception as e:
                 st.error(f"Computation Error: {e}")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional Risk Terminal</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional US Edition</p>", unsafe_allow_html=True)
