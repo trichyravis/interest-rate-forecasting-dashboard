@@ -140,12 +140,19 @@ if run_btn:
             # TAB 4: RISK METRICS
             with tabs[3]:
                 c1, c2, c3 = st.columns(3)
-                curr_rate = yields.iloc[-1]
-                pred_rate = arima_fc.iloc[-1]
-                bps = (pred_rate - curr_rate) * 100
-                
-                c1.metric("Current Spot", f"{curr_rate:.3f}%")
-                c2.metric("Expected Move", f"{bps:+.1f} bps")
+              # --- CHANGE THIS SECTION ---
+            curr_rate = yields.iloc[-1]
+            pred_rate = arima_fc.iloc[-1]
+            bps = (pred_rate - curr_rate) * 100
+
+            # --- TO THIS (Adding .item() or float() ensures it's a single number) ---
+            curr_rate = float(yields.iloc[-1])
+            pred_rate = float(arima_fc.iloc[-1])
+            bps = float((pred_rate - curr_rate) * 100)
+
+# This will now work without the TypeError
+c1.metric("Current Spot", f"{curr_rate:.3f}%")
+c2.metric("Expected Move", f"{bps:+.1f} bps")
                 c3.metric("VaR (95% Daily)", f"{res_garch.forecast(horizon=1).variance.values[-1,0]**0.5 * 1.645:.3f}%")
 
             # TAB 5: EDUCATIONAL HUB
