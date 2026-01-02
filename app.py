@@ -40,7 +40,7 @@ st.markdown(f"""
     </style>
     <div class="main-header">
         <h1>INTEREST RATE FORECASTING DASHBOARD</h1>
-        <p>The Mountain Path - World of Finance | Institutional Risk & Yield Analytics</p>
+        <p>The Mountain Path - World of Finance | Institutional Research Terminal</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -64,7 +64,7 @@ with st.sidebar:
     st.markdown(f"""
         <div style="text-align: center; padding: 15px; border-radius: 10px; background-color: rgba(255,255,255,0.15); border: 1px solid {GOLD};">
             <h3 style="color: white !important; margin: 0;">Prof. V. Ravichandran</h3>
-            <p style="color: white !important; font-size: 0.85rem; margin: 5px 0;">The Mountain Path World of Finance</p>
+            <p style="color: white !important; font-size: 0.85rem; margin: 5px 0;">The Mountain Path - World of Finance</p>
             <hr style="margin: 10px 0; border-color: {GOLD};">
             <a href="https://www.linkedin.com/in/trichyravis" target="_blank" style="text-decoration: none;">
                 <button style="background-color: #0077b5; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">🔗 LinkedIn Profile</button>
@@ -75,18 +75,11 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. ANALYTICS ENGINE
 # ═══════════════════════════════════════════════════════════════════════════════
-tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ GARCH Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Education"])
+tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ GARCH Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Educational Hub"])
 
 with tabs[0]:
     st.header("📖 Institutional Methodology")
-    st.write("This terminal provides a dual-framework analysis for sovereign debt benchmarks.")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("🕹️ Operational Guide")
-        st.markdown("1. Set Lookback & Horizon\n2. Configure α Confidence\n3. Execute Analysis")
-    with c2:
-        st.subheader("📑 Model Assumptions")
-        st.markdown("- Stationarity via ARIMA(d)\n- Volatility Clustering via GARCH\n- Normal Distribution for Parametric VaR")
+    st.write("This terminal provides a dual-framework analysis for sovereign debt benchmarks using Prof. Ravichandran’s quantitative standards.")
 
 if run_btn:
     with st.spinner("Processing Market Risk Engines..."):
@@ -100,31 +93,27 @@ if run_btn:
 
             try:
                 # 1. Fit ARIMA & GARCH
-                model_arima = pm.auto_arima(yields, seasonal=False)
+                model_arima = pm.auto_arima(yields, seasonal=False, suppress_warnings=True)
                 arima_fc = model_arima.predict(n_periods=horizon)
                 f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
-
+                
                 garch_fit = arch_model(returns, p=1, q=1, vol='Garch').fit(disp='off')
                 latest_vol = garch_fit.conditional_volatility.iloc[-1]
                 cond_vol = np.sqrt(garch_fit.conditional_volatility**2 * 252)
-                
-                # 2. VAR & Expected Shortfall Calculation
-                z_score = stats.norm.ppf(conf_level)
-                var_val = latest_vol * z_score
-                es_val = latest_vol * (stats.norm.pdf(z_score) / (1 - conf_level))
 
+                # 2. Populate Tabs
                 with tabs[1]: # Forecast
                     fig_f = go.Figure()
-                    fig_f.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="Actual"))
-                    fig_f.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="Forecast", line=dict(dash='dot', color='orange')))
-                    fig_f.update_layout(title="Yield Rate Path (ARIMA)", template="plotly_white")
-                    st.plotly_chart(fig_f, width='stretch')
+                    fig_f.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="Actual Yield"))
+                    fig_f.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA Forecast", line=dict(dash='dot', color='orange')))
+                    fig_f.update_layout(title=f"{ticker} Forecast Path", template="plotly_white")
+                    st.plotly_chart(fig_f, use_container_width=True)
 
                 with tabs[2]: # GARCH
-                    st.subheader("🌪️ Volatility Clustering (GARCH)")
+                    st.subheader("🌪️ Volatility Clustering Analysis")
                     fig_vol = go.Figure()
                     fig_vol.add_trace(go.Scatter(x=cond_vol.index, y=cond_vol, name="Ann. Volatility", line=dict(color='red')))
-                    st.plotly_chart(fig_vol, width='stretch')
+                    st.plotly_chart(fig_vol, use_container_width=True)
 
                 with tabs[3]: # Backtesting
                     st.subheader("🧪 30-Day Walk-Forward Validation")
@@ -132,52 +121,92 @@ if run_btn:
                     bt_model = pm.auto_arima(train_bt, seasonal=False)
                     bt_fc = bt_model.predict(n_periods=30)
                     fig_bt = go.Figure()
-                    fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Realized"))
-                    fig_bt.add_trace(go.Scatter(x=test_bt.index, y=bt_fc, name="Predicted", line=dict(dash='dash', color='orange')))
-                    st.plotly_chart(fig_bt, width='stretch')
+                    fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Realized Market Data", line=dict(color=CORPORATE_BLUE)))
+                    fig_bt.add_trace(go.Scatter(x=test_bt.index, y=bt_fc, name="Model Prediction", line=dict(dash='dash', color='orange')))
+                    st.plotly_chart(fig_bt, use_container_width=True)
 
                 with tabs[4]: # Diagnostics
-                    st.subheader("🔍 ARIMA Residual Diagnostics")
+                    st.subheader("🔍 Residual Analysis")
                     resid = model_arima.resid()
                     fig_resid = go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray')))
-                    st.plotly_chart(fig_resid, width='stretch')
+                    fig_resid.update_layout(title="Standardized Residuals (White Noise Check)", template="plotly_white")
+                    st.plotly_chart(fig_resid, use_container_width=True)
 
-                with tabs[5]: # RESTORED VAR DISPLAY
-                    st.subheader(f"📊 Value-at-Risk (VAR) & Tail Risk (α = {conf_level*100:.0f}%)")
+                with tabs[5]: # Metrics & VaR
+                    z_score = stats.norm.ppf(conf_level)
+                    var_val = latest_vol * z_score
+                    es_val = latest_vol * (stats.norm.pdf(z_score) / (1 - conf_level))
+                    
                     c1, c2, c3, c4 = st.columns(4)
                     c1.metric("Current Rate", f"{yields.iloc[-1]:.3f}%")
                     c2.metric("Ann. Volatility", f"{cond_vol.iloc[-1]:.1f}%")
-                    c3.metric("Daily VaR", f"{var_val:.3f}%", help="Threshold for maximum expected loss")
-                    c4.metric("Exp. Shortfall", f"{es_val:.3f}%", help="Average loss beyond VaR threshold")
+                    c3.metric("Daily VaR", f"{var_val:.3f}%")
+                    c4.metric("Exp. Shortfall", f"{es_val:.3f}%")
 
-                    # Visual Risk Distribution
+                    # Risk Distribution Plot
                     x = np.linspace(-5, 5, 200)
                     y = stats.norm.pdf(x, 0, 1)
                     fig_risk = go.Figure()
                     fig_risk.add_trace(go.Scatter(x=x, y=y, fill='tozeroy', name='Normal Dist', line=dict(color=CORPORATE_BLUE)))
                     mask_tail = x < -z_score
                     fig_risk.add_trace(go.Scatter(x=x[mask_tail], y=y[mask_tail], fill='tozeroy', fillcolor='rgba(255, 0, 0, 0.5)', name='Risk Zone'))
-                    fig_risk.update_layout(title="Tail Risk Visualization: VaR vs Expected Shortfall Zone", template="plotly_white")
-                    st.plotly_chart(fig_risk, width='stretch')
-                    
-                    
+                    fig_risk.update_layout(title="Tail Risk: VaR vs Expected Shortfall", template="plotly_white")
+                    st.plotly_chart(fig_risk, use_container_width=True)
 
                 with tabs[6]: # Export
                     export_df = pd.DataFrame({"Date": f_dates, "Forecast": arima_fc})
-                    st.dataframe(export_df, width='stretch')
-                    st.download_button("Download CSV", export_df.to_csv().encode('utf-8'), "forecast.csv")
-
-                with tabs[7]: # Education
-                    st.header("🎓 Quantitative Theory Hub")
-                    
-                    st.markdown("""
-                    **Expected Shortfall (ES):** As highlighted in Prof. Ravichandran's series, ES is a 'coherent' risk measure. 
-                    Unlike VaR, it considers the severity of the loss in the tail.
-                    """)
-                    
+                    st.dataframe(export_df, use_container_width=True)
+                    st.download_button("Download CSV", export_df.to_csv().encode('utf-8'), "forecast_report.csv")
 
             except Exception as e:
                 st.error(f"Computation Error: {e}")
 
+# 📚 DETAILED Q&A EDUCATIONAL HUB (Outside the run_btn block to be always accessible)
+with tabs[7]:
+    st.header("🎓 Quantitative Finance Q&A Hub")
+    st.write("Bridging Academic Theory with Institutional Practice.")
+
+    with st.expander("❓ What is the Box-Jenkins Methodology and why is it used here?"):
+        st.write("""
+        The Box-Jenkins methodology refers to the systematic process of identifying, estimating, and checking **ARIMA** models.
+        It is used here because interest rates often exhibit 'momentum' (Autoregression) and 'trends' (Integration).
+        By following this 3-stage process (Identification, Estimation, Diagnostics), we ensure the model is 'parsimonious'—meaning it uses the fewest parameters possible to achieve the highest accuracy.
+        """)
+        
+
+    with st.expander("❓ How does GARCH differ from standard Volatility measures?"):
+        st.write("""
+        Standard volatility (like Standard Deviation) assumes that risk is constant over time (**Homoskedasticity**). 
+        However, financial markets exhibit **Volatility Clustering**—where high-volatility days are likely to be followed by more high-volatility days.
+        **GARCH (Generalized Autoregressive Conditional Heteroskedasticity)** models this time-varying risk, allowing for more accurate pricing of derivatives and risk management.
+        """)
+        
+
+    with st.expander("❓ What is Value-at-Risk (VaR) vs. Expected Shortfall (ES)?"):
+        st.write("""
+        **VaR** answers: "What is the minimum loss I can expect with 95% confidence?" It is a threshold.
+        **Expected Shortfall (ES)** answers: "If I exceed my VaR threshold, what is the average magnitude of that loss?"
+        Institutional risk managers prefer ES because it captures 'Tail Risk' more effectively than VaR.
+        """)
+        
+
+    with st.expander("❓ What are Stochastic Models like Vasicek and CIR?"):
+        st.write("""
+        Stochastic models treat interest rates as a continuous 'random walk' with mean-reverting properties.
+        - **Vasicek Model:** Assumes rates revert to a long-term mean but can technically become negative.
+        - **Cox-Ingersoll-Ross (CIR):** Improves on Vasicek by ensuring rates stay positive, as volatility increases with the square root of the rate level.
+        """)
+        
+
+    with st.expander("❓ How does the Nelson-Siegel Model help in Yield Curve Fitting?"):
+        st.write("""
+        The Nelson-Siegel model decomposes the yield curve into three interpretable factors:
+        1. **Level ($\beta_0$):** The long-term rate.
+        2. **Slope ($\beta_1$):** The short-term spread.
+        3. **Curvature ($\beta_2$):** The 'hump' in the medium-term rates.
+        This is the industry standard used by central banks to estimate the term structure of interest rates.
+        """)
+        
+
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional Risk Terminal</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional US Edition</p>", unsafe_allow_html=True)
