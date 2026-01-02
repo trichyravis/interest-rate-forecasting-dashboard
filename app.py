@@ -26,11 +26,11 @@ GOLD_COLOR = "#FFD700"
 BRAND_NAME = "The Mountain Path - World of Finance"
 
 RATE_TICKERS = {
-    "^IN10Y": "India 10Y Benchmark G-Sec (RBI)",
+    "ID10Y=RR": "India 10Y Benchmark G-Sec (Refinitiv)",
+    "IN10Y.NS": "India 10Y Bond (NSE Alternative)",
     "^TNX": "US 10Y Treasury Yield",
     "^TYX": "US 30Y Treasury Yield",
-    "^FVX": "US 5Y Treasury Yield",
-    "^IRX": "US 13-Week Treasury Bill"
+    "^FVX": "US 5Y Treasury Yield"
 }
 
 st.set_page_config(page_title="Interest Rate Dashboard - The Mountain Path", page_icon="🏦", layout="wide")
