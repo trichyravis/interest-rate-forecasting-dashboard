@@ -15,7 +15,7 @@ import time
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. PAGE CONFIG & INSTITUTIONAL THEME
+# 1. PAGE CONFIG & THEME (OXFORD BLUE & GOLD)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="Institutional Risk & Yield Terminal", layout="wide")
 
@@ -37,6 +37,10 @@ st.markdown(f"""
     }}
     .stTabs [aria-selected="true"] {{ 
         background-color: {GOLD} !important; font-weight: bold; color: {CORPORATE_BLUE} !important; 
+    }}
+    .config-box {{
+        background-color: #f8f9fa; padding: 15px; border-radius: 10px;
+        border-left: 5px solid {CORPORATE_BLUE}; margin-bottom: 20px; color: {CORPORATE_BLUE};
     }}
     </style>
     <div class="main-header">
@@ -73,14 +77,14 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. DASHBOARD TABS
+# 3. ANALYTICS ENGINE & TABS
 # ═══════════════════════════════════════════════════════════════════════════════
 tabs = st.tabs(["ℹ️ About Platform", "📈 ARIMA Forecast", "🌪️ GARCH Risk", "🎲 Vasicek Path", "☀️ CIR Path", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Masterclass"])
 
 with tabs[0]:
     st.header("📖 Institutional Methodology & Framework")
     st.markdown("### 1. About the Dashboard")
-    st.write("Designed by Prof. V. Ravichandran, this terminal provides a multi-model approach to interest rate forecasting, utilizing statistical momentum (ARIMA) and stochastic equilibrium (Vasicek/CIR).")
+    st.write("Designed by Prof. V. Ravichandran to bridge academic theory with institutional practice. This terminal uses ARIMA for technical pathing, GARCH for risk regimes, and Vasicek/CIR for stochastic equilibrium.")
     
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -158,51 +162,84 @@ if run_btn:
                 fig_cir = go.Figure(go.Scatter(x=f_dates, y=c_med, name="CIR Median", line=dict(color='green')))
                 st.plotly_chart(fig_cir, width='stretch')
 
-            with tabs[5]: # RESTORED BACKTESTING
+            with tabs[5]: # BACKTESTING
                 st.subheader("🧪 30-Day Walk-Forward Validation")
                 train_bt, test_bt = yields.iloc[:-30], yields.iloc[-30:]
-                model_bt = pm.auto_arima(train_bt, seasonal=False)
-                fc_bt = model_bt.predict(n_periods=30)
-                fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Realized Market Data"))
-                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=fc_bt, name="Model Prediction", line=dict(dash='dash', color='orange')))
-                st.plotly_chart(fig_bt, width='stretch')
-                st.success(f"**Validation RMSE:** {np.sqrt(np.mean((test_bt - fc_bt)**2)):.4f}%")
-
-            with tabs[6]: # RESTORED DIAGNOSTICS
-                st.subheader("🔍 ARIMA Residual Diagnostics")
-                resid = model_arima.resid()
-                fig_resid = go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray')))
-                fig_resid.update_layout(title="Standardized Residuals (White Noise Check)")
-                st.plotly_chart(fig_resid, width='stretch')
-                st.info("💡 Residuals should appear as random white noise around zero for a healthy model fit.")
+                # Benchmarking all 3 models for the Performance Summary
+                m_arima_bt = pm.auto_arima(train_bt, seasonal=False).predict(n_periods=30)
                 
+                # Simple stochastic medians for backtest
+                v_paths_bt = np.zeros((100, 30)); v_paths_bt[:, 0] = train_bt.iloc[-1]/100
+                c_paths_bt = np.zeros((100, 30)); c_paths_bt[:, 0] = train_bt.iloc[-1]/100
+                for i in range(1, 30):
+                    v_paths_bt[:, i] = v_paths_bt[:, i-1] + kappa * (theta - v_paths_bt[:, i-1]) * dt + sigma * np.random.normal(0, np.sqrt(dt), 100)
+                    c_paths_bt[:, i] = c_paths_bt[:, i-1] + kappa * (theta - c_paths_bt[:, i-1]) * dt + sigma * np.sqrt(np.maximum(c_paths_bt[:, i-1], 0)) * np.random.normal(0, np.sqrt(dt), 100)
+                m_v_bt = np.percentile(v_paths_bt, 50, axis=0)*100
+                m_c_bt = np.percentile(c_paths_bt, 50, axis=0)*100
 
-            with tabs[7]: # METRICS
+                rmse_a = np.sqrt(np.mean((test_bt.values - m_arima_bt.values)**2))
+                rmse_v = np.sqrt(np.mean((test_bt.values - m_v_bt)**2))
+                rmse_c = np.sqrt(np.mean((test_bt.values - m_c_bt)**2))
+
+                fig_bt = go.Figure()
+                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Market Actual"))
+                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=m_arima_bt, name="ARIMA Prediction", line=dict(dash='dash')))
+                st.plotly_chart(fig_bt, width='stretch')
+
+            with tabs[6]: # DIAGNOSTICS
+                resid = model_arima.resid()
+                st.plotly_chart(go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray'))), width='stretch')
+
+            with tabs[7]: # METRICS & PERFORMANCE SUMMARY
+                st.subheader(f"📊 Quantitative Risk Metrics (α={conf_level})")
                 z_score = stats.norm.ppf(conf_level)
-                v = garch_fit.conditional_volatility.iloc[-1] * z_score
+                latest_vol_daily = garch_fit.conditional_volatility.iloc[-1]
+                var_val = latest_vol_daily * z_score
+                es_val = latest_vol_daily * (stats.norm.pdf(z_score)/(1-conf_level))
+                
                 c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Spot", f"{yields.iloc[-1]:.3f}%")
+                c1.metric("Current Rate", f"{yields.iloc[-1]:.3f}%")
                 c2.metric("ARIMA Forecast", f"{arima_fc.iloc[-1]:.3f}%")
-                c3.metric("CIR Median", f"{c_med[-1]:.3f}%")
-                c4.metric("Daily VaR", f"{v:.3f}%")
+                c3.metric("Daily VaR", f"{var_val:.3f}%")
+                c4.metric("Expected Shortfall", f"{es_val:.3f}%")
 
-            with tabs[8]: # EXPORT
-                export_df = pd.DataFrame({"Date": f_dates, "ARIMA": arima_fc, "Vasicek": v_med, "CIR": c_med})
-                st.dataframe(export_df, width='stretch')
-                st.download_button("📥 Download Models (CSV)", export_df.to_csv().encode('utf-8'), "multi_model_report.csv")
+                st.markdown("### 🏆 Model Performance Summary (RMSE)")
+                perf_df = pd.DataFrame({
+                    "Model": ["ARIMA (Momentum)", "Vasicek (Stochastic)", "CIR (Non-Negative)"],
+                    "RMSE (%)": [rmse_a, rmse_v, rmse_c],
+                    "Status": ["✅ Best" if rmse_a == min(rmse_a, rmse_v, rmse_c) else "Secondary",
+                              "✅ Best" if rmse_v == min(rmse_a, rmse_v, rmse_c) else "Secondary",
+                              "✅ Best" if rmse_c == min(rmse_a, rmse_v, rmse_c) else "Secondary"]
+                })
+                st.table(perf_df)
 
-        except Exception as e: st.error(f"Execution Error: {e}")
+                x_d = np.linspace(-4, 4, 200); y_d = stats.norm.pdf(x_d, 0, 1)
+                fig_r = go.Figure()
+                fig_r.add_trace(go.Scatter(x=x_d, y=y_d, fill='tozeroy', name='Normal', line=dict(color=CORPORATE_BLUE)))
+                fig_r.add_trace(go.Scatter(x=x_d[x_d < -z_score], y=y_d[x_d < -z_score], fill='tozeroy', fillcolor='rgba(255,0,0,0.5)', name='Tail Risk'))
+                st.plotly_chart(fig_r, width='stretch')
 
-# --- Q&A HUB ---
+            with tabs[8]: # COLORFUL EXPORT
+                st.subheader("📋 Colorful Data Export Terminal")
+                export_df = pd.DataFrame({
+                    "Date": f_dates.strftime('%Y-%m-%d'), 
+                    "ARIMA": arima_fc.values.round(4), 
+                    "Vasicek": v_med.round(4), 
+                    "CIR": c_med.round(4)
+                })
+                
+                def color_models(val):
+                    color = 'gold' if val > yields.iloc[-1] else 'lightblue'
+                    return f'background-color: {color}'
+
+                st.dataframe(export_df.style.applymap(color_models, subset=['ARIMA', 'Vasicek', 'CIR']), width='stretch')
+                st.download_button("📥 Download Colorful Report (CSV)", export_df.to_csv(index=False).encode('utf-8'), "multi_model_report.csv")
+
+        except Exception as e: st.error(f"Error: {e}")
+
 with tabs[9]:
-    st.header("🎓 Masterclass Q&A")
-    with st.expander("❓ Why is mean-reversion important?"):
-        st.write("Economics dictates that interest rates cannot drift infinitely. Equilibrium factors pull them back.")
-        
-    with st.expander("❓ What is Tail Risk?"):
-        st.write("Value-at-Risk (VaR) measures common losses; Expected Shortfall measures the severe tail.")
-        
+    st.header("🎓 Q&A Masterclass")
+    with st.expander("❓ What is RMSE?"): st.write("Root Mean Square Error (RMSE) measures the average magnitude of error between predicted and actual values.")
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance</p>", unsafe_allow_html=True)
