@@ -15,7 +15,7 @@ import time
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. PAGE CONFIG & THEME (OXFORD BLUE & GOLD)
+# 1. PAGE CONFIG & INSTITUTIONAL THEME
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="Institutional Risk & Yield Terminal", layout="wide")
 
@@ -29,32 +29,27 @@ st.markdown(f"""
         padding: 2rem; border-radius: 15px; color: white; text-align: center;
         margin-bottom: 2rem; border-bottom: 5px solid {GOLD};
     }}
-    [data-testid="stSidebar"] {{
-        background-color: {CORPORATE_BLUE} !important;
-        color: white !important;
-    }}
+    [data-testid="stSidebar"] {{ background-color: {CORPORATE_BLUE} !important; color: white !important; }}
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {{ color: white !important; }}
     div.stButton > button:first-child {{
-        background-color: {GOLD} !important;
-        color: {CORPORATE_BLUE} !important;
-        font-weight: bold !important;
-        width: 100%; border-radius: 8px;
-        border: none;
+        background-color: {GOLD} !important; color: {CORPORATE_BLUE} !important;
+        font-weight: bold !important; width: 100%; border-radius: 8px; border: none;
     }}
     .stTabs [aria-selected="true"] {{ 
-        background-color: {GOLD} !important; 
-        font-weight: bold; 
-        color: {CORPORATE_BLUE} !important; 
+        background-color: {GOLD} !important; font-weight: bold; color: {CORPORATE_BLUE} !important; 
     }}
     </style>
     <div class="main-header">
-        <h1>INTEREST RATE FORECASTING DASHBOARD</h1>
-        <p>Prof. V. Ravichandran | The Mountain Path - World of Finance</p>
+        <h1 style="margin-bottom: 0;">INTEREST RATE FORECASTING DASHBOARD</h1>
+        <h2 style="margin-top: 0; font-size: 1.5rem; opacity: 0.9;">(using ARIMA)</h2>
+        <p style="margin-top: 10px; font-weight: bold; font-size: 1.1rem;">
+            Prof. V. Ravichandran | The Mountain Path - World of Finance
+        </p>
     </div>
 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. SIDEBAR - PROFILE & CONTROLS
+# 2. SIDEBAR
 # ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.header("⚙️ Configuration")
@@ -64,7 +59,7 @@ with st.sidebar:
     horizon = st.slider("Forecast Horizon (Days)", 5, 60, 20)
     
     st.header("🛡️ Risk Parameters")
-    conf_level = st.select_slider("VaR Confidence Level (α)", options=[0.90, 0.95, 0.99], value=0.95)
+    conf_level = st.select_slider("Confidence Level (α)", options=[0.90, 0.95, 0.99], value=0.95)
     
     st.header("🎨 UI Settings")
     show_step = st.checkbox("Show Step-Wise Curve", value=True)
@@ -89,47 +84,44 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════════════════
 tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ GARCH Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Educational Hub"])
 
-# --- TAB 0: DETAILED ABOUT ---
 with tabs[0]:
     st.header("📖 Institutional Research Methodology")
-    st.markdown("""
-    This terminal is a quantitative decision-support system designed to bridge the gap between 
-    academic theory and fixed-income market practice. It utilizes a **dual-framework approach** to analyze sovereign debt benchmarks.
-    """)
+    st.markdown("This terminal provides a dual-framework analysis for sovereign debt benchmarks using Prof. Ravichandran’s quantitative standards.")
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🎯 Scope & Objectives")
-        st.markdown("""
-        - **Directional Pathing:** ARIMA methodology to identify momentum and mean-reversion.
-        - **Risk Estimation:** GARCH(1,1) to model regime-dependent volatility clustering.
-        - **Tail-Risk:** Calculation of Value-at-Risk (VaR) and Expected Shortfall (ES).
-        """)
+        st.markdown("- **Directional Pathing:** ARIMA methodology.\n- **Risk Estimation:** GARCH(1,1).\n- **Tail-Risk:** VaR and Expected Shortfall.")
     with col2:
         st.subheader("📑 Fundamental Assumptions")
-        st.markdown("""
-        - **Mean Reversion:** Rates gravitate toward a local trend.
-        - **Stationarity:** Yields are stabilized through first-order differencing ($d=1$).
-        - **Limitations:** Does not account for exogenous 'Black Swan' events or sudden Fed pivots.
-        """)
+        st.markdown("- Mean Reversion.\n- Stationarity via $d=1$.\n- Data includes all past price information.")
 
-# --- EXECUTION LOGIC ---
+# --- EXECUTION LOGIC WITH FIXED RETRY ---
 if run_btn:
-    data = None
-    # 🕒 PROGRESSIVE RETRY LOGIC (5s, 10s, 20s)
-    wait_times = [0, 5, 10, 20]
+    data = pd.DataFrame()
+    wait_times = [0, 5, 10, 20] # 0 for first attempt, then delays
+    success = False
+
     for attempt, delay in enumerate(wait_times):
         if delay > 0:
-            st.warning(f"⚠️ Yahoo Finance busy. Retrying in {delay} seconds (Attempt {attempt})...")
+            st.warning(f"⚠️ Attempt {attempt} failed. Yahoo Finance rate limit hit. Retrying in {delay} seconds...")
             time.sleep(delay)
-        with st.spinner("Fetching Institutional Data..."):
+        
+        with st.spinner(f"Attempting Data Fetch {attempt + 1}/4..."):
             try:
-                data = yf.download(ticker, period=f"{lookback}y", progress=False)
-                if not data.empty: break
-            except: continue
+                # Use Ticker object for more reliable retrieval than download()
+                t_obj = yf.Ticker(ticker)
+                data = t_obj.history(period=f"{lookback}y")
+                if not data.empty:
+                    success = True
+                    break
+            except Exception as e:
+                # Silently catch and proceed to next retry
+                continue
 
-    if data is None or data.empty:
-        st.error("❌ Data retrieval failed. Please try again in a few minutes.")
+    if not success or data.empty:
+        st.error("❌ All download attempts failed. Yahoo Finance is heavily limiting requests from this server. Please wait 5 minutes and try again.")
     else:
+        # DATA PROCESSING
         yields = data['Close'].dropna()
         if isinstance(yields, pd.DataFrame): yields = yields.iloc[:, 0]
         yields = yields.resample('B').last().ffill()
@@ -160,13 +152,6 @@ if run_btn:
                     fig_main.update_layout(template="plotly_white")
                     st.plotly_chart(fig_main, width='stretch')
 
-            # TAB 2: VOLATILITY
-            with tabs[2]:
-                st.subheader("🌪️ Volatility Clustering (GARCH 1,1)")
-                fig_vol = go.Figure(go.Scatter(x=cond_vol.index, y=cond_vol, line=dict(color='red')))
-                fig_vol.update_layout(template="plotly_white", title="Annualized Conditional Volatility (%)")
-                st.plotly_chart(fig_vol, width='stretch')
-
             # TAB 3: BACKTESTING
             with tabs[3]:
                 st.subheader("🧪 30-Day Walk-Forward Validation")
@@ -177,23 +162,12 @@ if run_btn:
                 fig_bt.add_trace(go.Scatter(x=test.index, y=test, name="Realized"))
                 fig_bt.add_trace(go.Scatter(x=test.index, y=bt_fc, name="Predicted", line=dict(dash='dash', color='orange')))
                 st.plotly_chart(fig_bt, width='stretch')
-                st.success(f"**Mean Absolute Error (MAE):** {np.mean(np.abs(test.values - bt_fc.values)):.4f}")
 
-            # TAB 4: DIAGNOSTICS
-            with tabs[4]:
-                st.subheader("🔍 ARIMA Residual Diagnostics")
-                resid = model_arima.resid()
-                fig_resid = go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray')))
-                fig_resid.update_layout(template="plotly_white", title="Standardized Residual Errors")
-                st.plotly_chart(fig_resid, width='stretch')
-                st.info("💡 Residuals should resemble 'White Noise'—random fluctuations around zero.")
-
-            # TAB 5: METRICS (VaR & ES)
+            # TAB 5: METRICS
             with tabs[5]:
                 z_score = stats.norm.ppf(conf_level)
                 var_val = latest_vol * z_score
                 es_val = latest_vol * (stats.norm.pdf(z_score) / (1 - conf_level))
-                
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("Current Rate", f"{yields.iloc[-1]:.3f}%")
                 c2.metric("Forecasted", f"{arima_fc.iloc[-1]:.3f}%")
@@ -206,41 +180,26 @@ if run_btn:
                 fig_risk.add_trace(go.Scatter(x=x_dist, y=y_dist, fill='tozeroy', name='Normal Dist', line=dict(color=CORPORATE_BLUE)))
                 mask = x_dist < -z_score
                 fig_risk.add_trace(go.Scatter(x=x_dist[mask], y=y_dist[mask], fill='tozeroy', fillcolor='rgba(255, 0, 0, 0.4)', name='Tail Risk'))
-                fig_risk.update_layout(title="Tail Risk Visualization: VaR vs Expected Shortfall Zone", template="plotly_white")
+                fig_risk.update_layout(title="Tail Risk Visualization", template="plotly_white")
                 st.plotly_chart(fig_risk, width='stretch')
 
             # TAB 6: EXPORT
             with tabs[6]:
-                st.subheader("📋 Data Export Terminal")
                 export_df = pd.DataFrame({"Date": f_dates, "Forecast": arima_fc})
                 st.dataframe(export_df, width='stretch')
-                st.download_button("📥 Download Report (CSV)", export_df.to_csv().encode('utf-8'), f"{ticker}_report.csv")
+                st.download_button("📥 Download CSV", export_df.to_csv().encode('utf-8'), "forecast.csv")
 
         except Exception as e:
             st.error(f"Computation Error: {e}")
 
-# --- TAB 7: DETAILED Q&A EDUCATIONAL HUB ---
+# TAB 7: Q&A Hub
 with tabs[7]:
     st.header("🎓 Quantitative Finance Q&A Hub")
-    st.write("Excerpts from Prof. V. Ravichandran’s Institutional Series.")
-
     with st.expander("❓ What is the Box-Jenkins Methodology?"):
-        st.write("It is an iterative 3-stage process: Identification, Estimation, and Diagnostics used to fit ARIMA models to non-stationary interest rate data.")
+        st.write("Excerpts from Prof. V. Ravichandran’s Institutional Series: Identifying, Estimating, and Diagnostic checking ARIMA models.")
         
-    
-    with st.expander("❓ Why use GARCH instead of standard Volatility?"):
-        st.write("Standard volatility assumes 'Homoscedasticity' (constant risk). GARCH accounts for 'Volatility Clustering,' recognizing that high-risk periods persist.")
-        
-    
-    with st.expander("❓ What is the difference between VaR and Expected Shortfall?"):
-        st.write("VaR is a threshold loss. Expected Shortfall (ES) measures the average loss *beyond* that threshold, capturing severe tail-risk.")
-        
-    
-    with st.expander("❓ What are Stochastic Models like Vasicek and CIR?"):
-        st.write("These models treat rates as a 'random walk' with mean-reversion. CIR specifically ensures rates stay non-negative.")
-
-    with st.expander("❓ How does the Nelson-Siegel Model fit the Yield Curve?"):
-        st.write("It decomposes the curve into Level, Slope, and Curvature factors ($\beta_0, \beta_1, \beta_2$).")
+    with st.expander("❓ Why use GARCH?"):
+        st.write("Standard volatility assumes constant risk. GARCH accounts for Volatility Clustering.")
         
 
 st.markdown("---")
