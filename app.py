@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. PAGE CONFIG & INSTITUTIONAL THEME
 # ═══════════════════════════════════════════════════════════════════════════════
-st.set_page_config(page_title="Institutional Yield & Volatility Terminal", layout="wide")
+st.set_page_config(page_title="Interest Rate Forecasting Dashboard", layout="wide")
 
 DARK_BLUE = "#003366"
 GOLD = "#FFD700"
@@ -27,53 +27,61 @@ st.markdown(f"""
         padding: 2rem; border-radius: 15px; color: white; text-align: center;
         margin-bottom: 2rem; border-bottom: 5px solid {GOLD};
     }}
-    [data-testid="stSidebar"] {{ background-color: #f0f2f6; border-right: 2px solid {DARK_BLUE}; }}
+    [data-testid="stSidebar"] {{ background-color: #0d47a1; color: white; }}
     .stTabs [data-baseweb="tab-list"] {{ gap: 10px; }}
     .stTabs [data-baseweb="tab"] {{
         background-color: #f0f2f6; border-radius: 5px 5px 0 0; padding: 10px 20px; color: {DARK_BLUE};
     }}
     .stTabs [aria-selected="true"] {{ background-color: {GOLD} !important; font-weight: bold; color: {DARK_BLUE} !important; }}
+    .summary-box {{
+        background-color: #ffffff; padding: 20px; border-radius: 10px; 
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-bottom: 25px;
+    }}
     </style>
     <div class="main-header">
-        <h1>INTEREST RATE & VOLATILITY TERMINAL</h1>
-        <p>Prof. V. Ravichandran | The Mountain Path - World of Finance</p>
+        <h1>INTEREST RATE FORECASTING DASHBOARD</h1>
+        <p>Traditional Time Series Modeling for Global Yields</p>
+        <p style="font-size: 0.9rem;">Prof. V. Ravichandran | 28+ Years Finance Experience</p>
     </div>
 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. SIDEBAR - ORIGINAL DESIGN RESTORED
+# 2. SIDEBAR - CONTROLS AT TOP, PROFILE AT BOTTOM
 # ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    # Original White Profile Card
+    st.header("⚙️ ARIMA Configuration")
+    ticker_label = st.selectbox("Select Security", [
+        "US 10Y Treasury (^TNX)", 
+        "US 30Y Treasury (^TYX)", 
+        "US 5Y Treasury (^FVX)"
+    ])
+    ticker = ticker_label.split("(")[1].replace(")", "")
+    
+    lookback = st.selectbox("Years of Historical Data", [1, 3, 5, 10], index=2)
+    
+    st.header("🔮 Forecast Settings")
+    horizon = st.slider("Forecast Horizon (Periods)", 5, 60, 10)
+    
+    run_btn = st.button("🟡 FETCH YIELDS & RUN MODEL", use_container_width=True)
+    
+    # PUSH PROFILE TO BOTTOM
+    st.markdown("<br>" * 10, unsafe_allow_html=True) 
+    st.markdown("---")
     st.markdown(f"""
-        <div style="text-align: center; padding: 15px; border-radius: 10px; background-color: #FFFFFF; border: 1px solid {DARK_BLUE}; margin-bottom: 20px;">
-            <h3 style="color: {DARK_BLUE}; margin: 0;">Prof. V. Ravichandran</h3>
-            <p style="color: gray; font-size: 0.85rem; margin: 5px 0;">The Mountain Path - World of Finance</p>
-            <hr style="margin: 10px 0;">
-            <a href="https://www.linkedin.com/in/v-ravichandran-finance" target="_blank">
-                <button style="background-color: #0077b5; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer;">LinkedIn Profile</button>
+        <div style="text-align: left; padding: 10px; border-radius: 10px; background-color: #003366; color: white; border: 1px solid {GOLD};">
+            <h4 style="margin: 0;">Prof. V. Ravichandran</h4>
+            <p style="font-size: 0.8rem; margin: 5px 0;">28+ Years Finance Experience</p>
+            <a href="https://www.linkedin.com/in/trichyravis" target="_blank" style="text-decoration: none;">
+                <button style="background-color: #0077b5; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">🔗 LinkedIn Profile</button>
             </a>
         </div>
     """, unsafe_allow_html=True)
-    
-    st.header("🇺🇸 Treasury Benchmarks")
-    ticker_label = st.selectbox("Maturity", ["US 10Y (^TNX)", "US 30Y (^TYX)", "US 5Y (^FVX)"])
-    ticker = ticker_label.split("(")[1].replace(")", "")
-    
-    lookback = st.slider("Lookback (Years)", 1, 10, 5)
-    horizon = st.slider("Forecast (Days)", 5, 60, 20)
-    
-    st.markdown("---")
-    run_btn = st.button("🚀 EXECUTE QUANT ANALYSIS")
-    st.markdown(f"<div style='text-align: center; font-size: 0.75rem; color: {DARK_BLUE};'>Institutional Analytics v2.7</div>", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. ANALYTICS ENGINE & BACKTESTING LOGIC
+# 3. SELECTION SUMMARY SECTION
 # ═══════════════════════════════════════════════════════════════════════════════
-tabs = st.tabs(["📈 Rate Forecast", "🌪️ Volatility (GARCH)", "🧪 Backtesting", "📊 Risk Metrics", "📚 Educational Hub"])
-
 if run_btn:
-    with st.spinner("Accessing Institutional Feeds..."):
+    with st.spinner("Analyzing Market Data..."):
         data = yf.download(ticker, period=f"{lookback}y", interval="1d", progress=False)
         
         if not data.empty:
@@ -83,75 +91,51 @@ if run_btn:
             returns = 100 * yields.pct_change().dropna()
 
             try:
-                # ARIMA Model
-                model_arima = pm.auto_arima(yields, seasonal=False, suppress_warnings=True)
+                # RUN MODELS
+                model_arima = pm.auto_arima(yields, seasonal=False)
                 arima_fc = model_arima.predict(n_periods=horizon)
-                order = model_arima.order
                 
-                # GARCH Model
-                garch = arch_model(returns, p=1, q=1, vol='Garch', dist='Normal')
-                res_garch = garch.fit(disp='off')
-                garch_fc = res_garch.forecast(horizon=horizon)
+                # SELECTION SUMMARY BOX
+                st.markdown("### 📊 Selection Summary")
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.write("**Yield**"); st.subheader(ticker)
+                with c2: st.write("**History**"); st.subheader(f"{lookback}y")
+                with c3: st.write("**Mode**"); st.subheader("Auto ARIMA")
+                with c4: st.write("**Horizon**"); st.subheader(horizon)
+                st.markdown("---")
 
-                # --- TAB 1: Rate Forecast ---
-                with tabs[0]:
+                # TABS INTERFACE
+                tabs = st.tabs(["📈 Forecast", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📚 Educational Hub"])
+
+                with tabs[0]: # Forecast
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Actual", line=dict(color=DARK_BLUE)))
+                    fig.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Historical", line=dict(color=DARK_BLUE)))
                     f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
-                    fig.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA Forecast", line=dict(color="orange", dash='dot', width=3)))
-                    fig.update_layout(title=f"{ticker} Yield Projection (ARIMA{order})", template="plotly_white")
+                    fig.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA Forecast", line=dict(color="orange", dash='dot')))
+                    fig.update_layout(title="Yield Projection", template="plotly_white")
                     st.plotly_chart(fig, use_container_width=True)
 
-                # --- TAB 2: Volatility ---
-                with tabs[1]:
-                    ann_vol = np.sqrt(res_garch.conditional_volatility**2 * 252)
-                    fig_v = go.Figure()
-                    fig_v.add_trace(go.Scatter(x=yields.index[-250:], y=ann_vol.tail(250), name="GARCH Vol", line=dict(color="red")))
-                    fig_v.update_layout(title="Annualized Conditional Volatility (%)", template="plotly_white")
-                    st.plotly_chart(fig_v, use_container_width=True)
-
-                # --- TAB 3: BACKTESTING (RESORED & FIXED) ---
-                with tabs[2]:
-                    st.subheader("Historical Validation (Walk-Forward)")
-                    # Split data for a 30-day backtest
-                    train_data = yields.iloc[:-30]
-                    test_data = yields.iloc[-30:]
-                    
-                    bt_model = pm.auto_arima(train_data, seasonal=False)
-                    bt_forecast = bt_model.predict(n_periods=30)
-                    
+                with tabs[1]: # Backtesting
+                    train, test = yields.iloc[:-30], yields.iloc[-30:]
+                    bt_model = pm.auto_arima(train, seasonal=False)
+                    bt_fc = bt_model.predict(n_periods=30)
                     fig_bt = go.Figure()
-                    fig_bt.add_trace(go.Scatter(x=test_data.index, y=test_data, name="Realized Market Data", line=dict(color=DARK_BLUE)))
-                    fig_bt.add_trace(go.Scatter(x=test_data.index, y=bt_forecast, name="Model Prediction", line=dict(color="gray", dash='dash')))
-                    fig_bt.update_layout(title="30-Day Out-of-Sample Backtest", template="plotly_white")
+                    fig_bt.add_trace(go.Scatter(x=test.index, y=test, name="Realized"))
+                    fig_bt.add_trace(go.Scatter(x=test.index, y=bt_fc, name="Predicted", line=dict(dash='dash')))
                     st.plotly_chart(fig_bt, use_container_width=True)
-                    
-                    mae = np.mean(np.abs(test_data.values - bt_forecast.values))
-                    st.success(f"**Mean Absolute Error (MAE):** {mae:.4f}")
 
-                # --- TAB 4: Metrics ---
-                with tabs[3]:
-                    c1, c2, c3 = st.columns(3)
-                    curr = float(yields.iloc[-1])
-                    pred = float(arima_fc.iloc[-1])
-                    bps = (pred - curr) * 100
-                    var_val = float(np.sqrt(garch_fc.variance.values[-1, 0]) * 1.645)
-                    
-                    c1.metric("Current Spot", f"{curr:.3f}%")
-                    c2.metric("Expected Move", f"{bps:+.1f} bps")
-                    c3.metric("Daily VaR (95%)", f"{var_val:.3f}%")
+                with tabs[3]: # Metrics
+                    m1, m2, m3 = st.columns(3)
+                    curr, pred = float(yields.iloc[-1]), float(arima_fc.iloc[-1])
+                    m1.metric("Current Yield", f"{curr:.3f}%")
+                    m2.metric("Forecasted Yield", f"{pred:.3f}%")
+                    m3.metric("Basis Point Shift", f"{(pred-curr)*100:+.1f} bps")
 
-                # --- TAB 5: Education ---
-                with tabs[4]:
-                    st.header("🎓 The Quantitative Framework")
-                    # 
-                    st.markdown("""
-                    **Stage 1: ARIMA Modeling** Captures momentum.
-                    **Stage 2: GARCH(1,1)** Models 'Volatility Clustering'.
-                    """)
+                with tabs[4]: # Educational Hub
+                    st.header("🎓 Box-Jenkins ARIMA Framework")
+                                        st.info("The ARIMA model combines Autoregressive (p), Integrated (d), and Moving Average (q) components to forecast future interest rate paths.")
 
             except Exception as e:
-                st.error(f"Computation Error: {e}")
+                st.error(f"Modeling Error: {e}")
 
-st.markdown("---")
-st.markdown(f"<p style='text-align: center; color: gray;'>© 2026 The Mountain Path - World of Finance | Institutional US Edition</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align: center; color: gray;'>The Mountain Path - World of Finance | Built for Professional Excellence</p>", unsafe_allow_html=True)
