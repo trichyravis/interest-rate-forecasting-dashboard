@@ -73,55 +73,42 @@ with st.sidebar:
             <h3 style="color: white !important; margin: 0;">Prof. V. Ravichandran</h3>
             <p style="color: white !important; font-size: 0.85rem; margin: 5px 0;">The Mountain Path - World of Finance</p>
             <hr style="margin: 10px 0; border-color: {GOLD};">
-            <a href="https://www.linkedin.com/in/trichyravis" target="_blank" style="text-decoration: none;">
+            <a href="https://www.linkedin.com/in/trichyravis" target="_blank">
                 <button style="background-color: #0077b5; color: white; border: none; padding: 10px; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold;">🔗 LinkedIn Profile</button>
             </a>
         </div>
     """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. TABBED INTERFACE
+# 3. DASHBOARD INTERFACE
 # ═══════════════════════════════════════════════════════════════════════════════
 tabs = st.tabs(["ℹ️ About", "📈 Forecast", "🌪️ GARCH Volatility", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Educational Hub"])
 
 with tabs[0]:
-    st.header("📖 Institutional Research Methodology")
-    st.markdown("This terminal provides a dual-framework analysis for sovereign debt benchmarks using Prof. Ravichandran’s quantitative standards.")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("🎯 Scope & Objectives")
-        st.markdown("- **Directional Pathing:** ARIMA methodology.\n- **Risk Estimation:** GARCH(1,1).\n- **Tail-Risk:** VaR and Expected Shortfall.")
-    with col2:
-        st.subheader("📑 Fundamental Assumptions")
-        st.markdown("- Mean Reversion.\n- Stationarity via $d=1$.\n- Data includes all past price information.")
+    st.header("📖 Institutional Methodology")
+    st.write("This terminal provides a dual-framework analysis using Prof. Ravichandran’s quantitative standards for yield and risk estimation.")
 
-# --- EXECUTION LOGIC WITH FIXED RETRY ---
 if run_btn:
     data = pd.DataFrame()
-    wait_times = [0, 5, 10, 20] # 0 for first attempt, then delays
+    wait_times = [0, 5, 10, 20, 30, 60] 
     success = False
 
     for attempt, delay in enumerate(wait_times):
         if delay > 0:
-            st.warning(f"⚠️ Attempt {attempt} failed. Yahoo Finance rate limit hit. Retrying in {delay} seconds...")
+            st.warning(f"⚠️ Attempt {attempt} failed (Rate Limited). Retrying in {delay}s...")
             time.sleep(delay)
-        
-        with st.spinner(f"Attempting Data Fetch {attempt + 1}/4..."):
+        with st.spinner(f"Fetching Data {attempt + 1}/6..."):
             try:
-                # Use Ticker object for more reliable retrieval than download()
                 t_obj = yf.Ticker(ticker)
                 data = t_obj.history(period=f"{lookback}y")
                 if not data.empty:
                     success = True
                     break
-            except Exception as e:
-                # Silently catch and proceed to next retry
-                continue
+            except: continue
 
     if not success or data.empty:
-        st.error("❌ All download attempts failed. Yahoo Finance is heavily limiting requests from this server. Please wait 5 minutes and try again.")
+        st.error("❌ Yahoo Finance Limit Reached. Please try again in 5 minutes.")
     else:
-        # DATA PROCESSING
         yields = data['Close'].dropna()
         if isinstance(yields, pd.DataFrame): yields = yields.iloc[:, 0]
         yields = yields.resample('B').last().ffill()
@@ -141,16 +128,24 @@ if run_btn:
             with tabs[1]:
                 if show_step:
                     fig_step = go.Figure()
-                    fig_step.add_trace(go.Scatter(x=f_dates, y=arima_fc, mode='lines+markers', line_shape='hv', 
-                                                line=dict(color='#FF4B4B', width=4), name="Step Curve"))
-                    fig_step.update_layout(template="plotly_dark", title="Institutional Step-Wise Forecast", paper_bgcolor='rgba(0,0,0,0)')
+                    fig_step.add_trace(go.Scatter(x=f_dates, y=arima_fc, mode='lines+markers', line_shape='hv', line=dict(color='#FF4B4B', width=4)))
+                    fig_step.update_layout(template="plotly_dark", title="Step-Wise Forecast", paper_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig_step, width='stretch')
                 else:
-                    fig_main = go.Figure()
-                    fig_main.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="Actual"))
-                    fig_main.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA", line=dict(dash='dot', color='orange')))
-                    fig_main.update_layout(template="plotly_white")
-                    st.plotly_chart(fig_main, width='stretch')
+                    fig_f = go.Figure()
+                    fig_f.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="Actual"))
+                    fig_f.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA", line=dict(dash='dot', color='orange')))
+                    fig_f.update_layout(template="plotly_white")
+                    st.plotly_chart(fig_f, width='stretch')
+
+            # TAB 2: RESTORED GARCH VOLATILITY
+            with tabs[2]:
+                st.subheader("🌪️ Conditional Volatility (GARCH 1,1)")
+                
+                fig_v = go.Figure()
+                fig_v.add_trace(go.Scatter(x=cond_vol.index, y=cond_vol, name="Annualized Vol", line=dict(color='red')))
+                fig_v.update_layout(title="Annualized Conditional Volatility (%)", template="plotly_white")
+                st.plotly_chart(fig_v, width='stretch')
 
             # TAB 3: BACKTESTING
             with tabs[3]:
@@ -174,32 +169,45 @@ if run_btn:
                 c3.metric("Daily VaR", f"{var_val:.3f}%")
                 c4.metric("Exp. Shortfall", f"{es_val:.3f}%")
 
-                x_dist = np.linspace(-5, 5, 200)
-                y_dist = stats.norm.pdf(x_dist, 0, 1)
-                fig_risk = go.Figure()
-                fig_risk.add_trace(go.Scatter(x=x_dist, y=y_dist, fill='tozeroy', name='Normal Dist', line=dict(color=CORPORATE_BLUE)))
-                mask = x_dist < -z_score
-                fig_risk.add_trace(go.Scatter(x=x_dist[mask], y=y_dist[mask], fill='tozeroy', fillcolor='rgba(255, 0, 0, 0.4)', name='Tail Risk'))
-                fig_risk.update_layout(title="Tail Risk Visualization", template="plotly_white")
-                st.plotly_chart(fig_risk, width='stretch')
-
-            # TAB 6: EXPORT
-            with tabs[6]:
-                export_df = pd.DataFrame({"Date": f_dates, "Forecast": arima_fc})
-                st.dataframe(export_df, width='stretch')
-                st.download_button("📥 Download CSV", export_df.to_csv().encode('utf-8'), "forecast.csv")
+                x_d = np.linspace(-5, 5, 200); y_d = stats.norm.pdf(x_d, 0, 1)
+                fig_r = go.Figure()
+                fig_r.add_trace(go.Scatter(x=x_d, y=y_d, fill='tozeroy', line=dict(color=CORPORATE_BLUE)))
+                fig_r.add_trace(go.Scatter(x=x_d[x_d < -z_score], y=y_d[x_d < -z_score], fill='tozeroy', fillcolor='rgba(255,0,0,0.5)'))
+                fig_r.update_layout(title="Tail Risk Visualization", template="plotly_white")
+                st.plotly_chart(fig_r, width='stretch')
 
         except Exception as e:
             st.error(f"Computation Error: {e}")
 
-# TAB 7: Q&A Hub
+# --- RESTORED COMPREHENSIVE Q&A HUB ---
 with tabs[7]:
     st.header("🎓 Quantitative Finance Q&A Hub")
-    with st.expander("❓ What is the Box-Jenkins Methodology?"):
-        st.write("Excerpts from Prof. V. Ravichandran’s Institutional Series: Identifying, Estimating, and Diagnostic checking ARIMA models.")
+    st.write("Detailed notes covering Interest Rate Forecasting Methodologies.")
+
+    with st.expander("❓ What is the Box-Jenkins Methodology (ARIMA)?"):
+        st.write("""
+        **Definition:** A systematic 3-stage iterative process (Identification, Estimation, Diagnostics) for fitting time series models.
+        **Application:** Essential for interest rates because they are usually non-stationary. The model uses Autoregressive (p), Integrated (d), and Moving Average (q) components.
+        """)
         
-    with st.expander("❓ Why use GARCH?"):
-        st.write("Standard volatility assumes constant risk. GARCH accounts for Volatility Clustering.")
+
+    with st.expander("❓ How does GARCH model Volatility Clustering?"):
+        st.write("""
+        **Definition:** GARCH (Generalized Autoregressive Conditional Heteroskedasticity) models time-varying variance.
+        **Logic:** In fixed income, large changes tend to be followed by large changes. GARCH captures these regimes, unlike standard deviation which assumes risk is constant.
+        """)
+
+    with st.expander("❓ Explain Stochastic Models: Vasicek vs CIR?"):
+        st.write("""
+        **Vasicek Model:** Assumes interest rates are mean-reverting. If rates are high, they are pulled down; if low, they are pulled up.
+        **CIR Model:** Similar to Vasicek but introduces a 'square root' term that prevents interest rates from becoming negative, which is a key mathematical requirement in many economies.
+        """)
+
+    with st.expander("❓ What is the Nelson-Siegel Model for Yield Curves?"):
+        st.write("""
+        **Definition:** A factor-based model used by central banks to fit the entire term structure.
+        **Three Factors:** Level (long-term), Slope (short-term), and Curvature (medium-term). It allows analysts to visualize the 'hump' or 'twist' in the yield curve.
+        """)
         
 
 st.markdown("---")
