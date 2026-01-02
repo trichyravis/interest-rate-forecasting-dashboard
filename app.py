@@ -4,18 +4,27 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 import pmdarima as pm
-from statsmodels.tsa.arima.model import ARIMA
 from arch import arch_model 
 import scipy.stats as stats
 import warnings
 import time
+import os
+
+# --- MODULAR IMPORT LOGIC ---
+# This ensures that if the content files are missing, the app doesn't crash
+try:
+    from content.about_text import ABOUT_CONTENT
+    from content.qa_text import QA_MASTERCLASS
+except ImportError:
+    ABOUT_CONTENT = {"intro": "Methodology Content Missing", "arima": "", "vasicek": "", "cir": ""}
+    QA_MASTERCLASS = [("Error", "Content files not found in /content/ folder.")]
 
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. PAGE CONFIG & THEME
+# 1. PAGE CONFIG & INSTITUTIONAL THEME
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="Institutional Risk & Yield Terminal", layout="wide")
 
@@ -73,25 +82,17 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. ANALYTICS ENGINE & TABS
+# 3. DASHBOARD TABS
 # ═══════════════════════════════════════════════════════════════════════════════
-tabs = st.tabs(["ℹ️ About Platform", "📈 ARIMA Forecast", "🌪️ GARCH Risk", "🎲 Vasicek Path", "☀️ CIR Path", "🧪 Backtesting", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Masterclass"])
+tabs = st.tabs(["ℹ️ About", "📈 ARIMA", "🌪️ GARCH", "🎲 Vasicek", "☀️ CIR", "🧪 Backtest", "🔍 Diagnostics", "📊 Metrics", "📋 Export", "📚 Q&A Masterclass"])
 
 with tabs[0]:
-    st.header("📖 Institutional Methodology & Framework")
-    st.markdown("### 1. About the Dashboard")
-    st.write("Designed by Prof. V. Ravichandran to provide a multi-model approach to interest rate risk management.")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.subheader("📊 ARIMA")
-        st.markdown("**Scope:** Short-term momentum.\n**Assumptions:** Weak-form efficiency.")
-    with col2:
-        st.subheader("🎲 Vasicek")
-        st.markdown("**Scope:** Equilibrium simulation.\n**Assumptions:** Constant volatility.")
-    with col3:
-        st.subheader("☀️ CIR")
-        st.markdown("**Scope:** Low-rate regimes.\n**Assumptions:** Variable volatility.")
+    st.header("📖 Institutional Methodology")
+    st.write(ABOUT_CONTENT["intro"])
+    c1, c2, c3 = st.columns(3)
+    with c1: st.info(f"**ARIMA (Momentum)**\n\n{ABOUT_CONTENT['arima']}")
+    with c2: st.warning(f"**Vasicek (Equilibrium)**\n\n{ABOUT_CONTENT['vasicek']}")
+    with c3: st.success(f"**CIR (Non-Negative)**\n\n{ABOUT_CONTENT['cir']}")
 
 if run_btn:
     data = pd.DataFrame()
@@ -100,16 +101,15 @@ if run_btn:
 
     for attempt, delay in enumerate(wait_times):
         if delay > 0:
-            st.warning(f"⚠️ Yahoo Finance busy. Retrying in {delay}s...")
+            st.warning(f"⚠️ Rate limited. Retrying in {delay}s...")
             time.sleep(delay)
-        with st.spinner(f"Fetching Data {attempt + 1}/6..."):
-            try:
-                t_obj = yf.Ticker(ticker)
-                data = t_obj.history(period=f"{lookback}y")
-                if not data.empty:
-                    success = True
-                    break
-            except: continue
+        try:
+            t_obj = yf.Ticker(ticker)
+            data = t_obj.history(period=f"{lookback}y")
+            if not data.empty:
+                success = True
+                break
+        except: continue
 
     if success:
         yields = data['Close'].dropna()
@@ -118,7 +118,7 @@ if run_btn:
         returns = 100 * yields.pct_change().dropna()
 
         try:
-            # --- MODEL ENGINES ---
+            # --- ENGINES ---
             model_arima = pm.auto_arima(yields, seasonal=False, suppress_warnings=True)
             arima_fc = model_arima.predict(n_periods=horizon)
             f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
@@ -129,91 +129,91 @@ if run_btn:
             r0, kappa, theta, sigma = yields.iloc[-1]/100, 0.20, 0.045, 0.015
             dt, n_paths = 1/252, 1000
 
-            # --- POPULATE TABS ---
-            with tabs[1]: # ARIMA
+            # 📈 ARIMA
+            with tabs[1]:
                 fig_f = go.Figure()
                 fig_f.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="History"))
                 fig_f.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="Forecast", line=dict(dash='dot', color='orange')))
-                st.plotly_chart(fig_f, width='stretch')
+                st.plotly_chart(fig_f, use_container_width=True)
 
-            with tabs[2]: # GARCH
-                fig_v = go.Figure(go.Scatter(x=cond_vol.index, y=cond_vol, line=dict(color='red')))
-                st.plotly_chart(fig_v, width='stretch')
+            # 🌪️ GARCH
+            with tabs[2]:
+                st.plotly_chart(go.Figure(go.Scatter(x=cond_vol.index, y=cond_vol, line=dict(color='red'))), use_container_width=True)
 
-            with tabs[3]: # VASICEK
+            # 🎲 VASICEK
+            with tabs[3]:
                 v_paths = np.zeros((n_paths, horizon))
                 v_paths[:, 0] = r0
                 for i in range(1, horizon):
-                    v_paths[:, i] = v_paths[:, i-1] + kappa * (theta - v_paths[:, i-1]) * dt + sigma * np.random.normal(0, np.sqrt(dt), n_paths)
+                    v_paths[:, i] = v_paths[:, i-1] + kappa*(theta-v_paths[:, i-1])*dt + sigma*np.random.normal(0, np.sqrt(dt), n_paths)
                 v_med = np.percentile(v_paths, 50, axis=0)*100
-                st.plotly_chart(go.Figure(go.Scatter(x=f_dates, y=v_med, name="Vasicek Median")), width='stretch')
+                st.plotly_chart(go.Figure(go.Scatter(x=f_dates, y=v_med, name="Vasicek Median")), use_container_width=True)
 
-            with tabs[4]: # CIR
+            # ☀️ CIR
+            with tabs[4]:
                 c_paths = np.zeros((n_paths, horizon))
                 c_paths[:, 0] = r0
                 for i in range(1, horizon):
-                    c_paths[:, i] = c_paths[:, i-1] + kappa * (theta - c_paths[:, i-1]) * dt + sigma * np.sqrt(np.maximum(c_paths[:, i-1], 0)) * np.random.normal(0, np.sqrt(dt), n_paths)
+                    c_paths[:, i] = c_paths[:, i-1] + kappa*(theta-c_paths[:, i-1])*dt + sigma*np.sqrt(np.maximum(c_paths[:, i-1],0))*np.random.normal(0, np.sqrt(dt), n_paths)
                 c_med = np.percentile(c_paths, 50, axis=0)*100
-                st.plotly_chart(go.Figure(go.Scatter(x=f_dates, y=c_med, name="CIR Median")), width='stretch')
+                st.plotly_chart(go.Figure(go.Scatter(x=f_dates, y=c_med, name="CIR Median", line=dict(color='green'))), use_container_width=True)
 
-            with tabs[5]: # BACKTESTING
+            # 🧪 BACKTESTING
+            with tabs[5]:
                 train_bt, test_bt = yields.iloc[:-30], yields.iloc[-30:]
-                m_arima_bt = pm.auto_arima(train_bt, seasonal=False).predict(n_periods=30)
-                rmse_a = np.sqrt(np.mean((test_bt.values - m_arima_bt.values)**2))
+                m_bt = pm.auto_arima(train_bt, seasonal=False).predict(n_periods=30)
+                rmse_bt = np.sqrt(np.mean((test_bt.values - m_bt.values)**2))
                 fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Market Actual"))
-                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=m_arima_bt, name="ARIMA Prediction", line=dict(dash='dash')))
-                st.plotly_chart(fig_bt, width='stretch')
+                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Market"))
+                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=m_bt, name="ARIMA Forecast", line=dict(dash='dash')))
+                st.plotly_chart(fig_bt, use_container_width=True)
+                st.success(f"**Walk-Forward RMSE:** {rmse_bt:.4f}%")
 
-            # --- RESTORED DIAGNOSTICS TAB ---
+            # 🔍 DIAGNOSTICS
             with tabs[6]:
-                st.subheader("🔍 ARIMA Residual Diagnostics")
                 resid = model_arima.resid()
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    fig_resid = go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray')))
-                    fig_resid.update_layout(title="Residuals Over Time (White Noise Check)", template="plotly_white")
-                    st.plotly_chart(fig_resid, width='stretch')
-                
-                with c2:
-                    # Normal Q-Q Calculation for Normality Check
-                    sorted_resid = np.sort(resid)
-                    norm_quantiles = stats.norm.ppf(np.linspace(0.01, 0.99, len(resid)))
-                    fig_qq = go.Figure()
-                    fig_qq.add_trace(go.Scatter(x=norm_quantiles, y=sorted_resid, mode='markers', name="Residuals"))
-                    fig_qq.add_trace(go.Scatter(x=norm_quantiles, y=norm_quantiles, mode='lines', line=dict(color='red'), name="Theoretical Normal"))
-                    fig_qq.update_layout(title="Normal Q-Q Plot", xaxis_title="Theoretical Quantiles", yaxis_title="Sample Quantiles", template="plotly_white")
-                    st.plotly_chart(fig_qq, width='stretch')
-                
-                st.info("💡 **Institutional Rule:** If the residuals follow the red line in the Q-Q plot, the model error is normally distributed, making your VaR calculations highly reliable.")
-                
+                st.plotly_chart(go.Figure(go.Scatter(y=resid, mode='lines', line=dict(color='gray'))), use_container_width=True)
+                st.info("💡 Residuals should appear as random white noise around zero.")
 
-            with tabs[7]: # METRICS
+            # 📊 METRICS & TAIL RISK
+            with tabs[7]:
                 z_score = stats.norm.ppf(conf_level)
                 latest_vol_daily = garch_fit.conditional_volatility.iloc[-1]
                 var_val = latest_vol_daily * z_score
                 es_val = latest_vol_daily * (stats.norm.pdf(z_score)/(1-conf_level))
+                
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("Spot Rate", f"{yields.iloc[-1]:.3f}%")
                 c2.metric("ARIMA Forecast", f"{arima_fc.iloc[-1]:.3f}%")
                 c3.metric("Daily VaR", f"{var_val:.3f}%")
-                c4.metric("Exp. Shortfall", f"{es_val:.3f}%")
-                
-                st.markdown("### 🏆 Model Performance Summary (RMSE)")
-                st.table(pd.DataFrame({"Model": ["ARIMA"], "RMSE (%)": [f"{rmse_a:.4f}"]}))
+                c4.metric("Exp. Shortfall (ES)", f"{es_val:.3f}%")
 
-            with tabs[8]: # EXPORT
-                export_df = pd.DataFrame({"Date": f_dates.strftime('%Y-%m-%d'), "ARIMA (%)": arima_fc.values.round(4)})
-                st.dataframe(export_df, width='stretch')
-                st.download_button("📥 Download Report (CSV)", export_df.to_csv(index=False).encode('utf-8'), "yield_report.csv")
+                x_d = np.linspace(-4, 4, 200); y_d = stats.norm.pdf(x_d, 0, 1)
+                fig_r = go.Figure()
+                fig_r.add_trace(go.Scatter(x=x_d, y=y_d, fill='tozeroy', name='Normal', line=dict(color=CORPORATE_BLUE)))
+                fig_r.add_trace(go.Scatter(x=x_d[x_d < -z_score], y=y_d[x_d < -z_score], fill='tozeroy', fillcolor='rgba(255,0,0,0.5)', name='Tail Risk Zone'))
+                st.plotly_chart(fig_r, use_container_width=True)
+
+            # 📋 AMENDED EXPORT TAB
+            with tabs[8]:
+                st.subheader("📋 Comprehensive Institutional Quantitative Report")
+                export_df = pd.DataFrame({
+                    "Date": f_dates.strftime('%Y-%m-%d'),
+                    "ARIMA Forecast (%)": arima_fc.values.round(4),
+                    "Vasicek Median (%)": v_med.round(4),
+                    "CIR Median (%)": c_med.round(4),
+                    "Expected Volatility (%)": (cond_vol.tail(len(f_dates)).values).round(4)
+                })
+
+                st.dataframe(export_df.style.background_gradient(cmap='YlGnBu').format(precision=4), use_container_width=True)
+                st.download_button("📥 Download Quantitative Report (CSV)", export_df.to_csv(index=False).encode('utf-8'), f"{ticker}_report.csv")
 
         except Exception as e: st.error(f"Execution Error: {e}")
 
-with tabs[9]: # Q&A HUB
+# 📚 MASTERCLASS Q&A
+with tabs[9]:
     st.header("🎓 Masterclass Q&A")
-    qa = [("What is the Box-Jenkins methodology?", "An iterative process for ARIMA fitting.")]
-    for q, a in qa:
+    for q, a in QA_MASTERCLASS:
         with st.expander(q): st.write(a)
 
 st.markdown("---")
