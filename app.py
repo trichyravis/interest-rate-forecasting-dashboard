@@ -74,10 +74,8 @@ with st.sidebar:
     st.markdown(f"<div style='text-align: center; font-size: 0.75rem; color: {DARK_BLUE};'>Institutional Analytics v2.5</div>", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. ANALYTICS ENGINE
+# 3. ANALYTICS ENGINE (ARIMA + GARCH)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
 tabs = st.tabs(["📈 Rate Forecast", "🌪️ Volatility (GARCH)", "🧪 Backtesting", "📊 Risk Metrics", "📚 Educational Hub"])
 
 if run_btn:
@@ -86,7 +84,7 @@ if run_btn:
         data = yf.download(ticker, period=f"{lookback}y", interval="1d", progress=False)
         
         if not data.empty:
-            # Flatten to Series
+            # Clean data and ensure it's a Series for calculations
             yields = data['Close'].dropna()
             if isinstance(yields, pd.DataFrame): 
                 yields = yields.iloc[:, 0]
@@ -96,12 +94,12 @@ if run_btn:
             returns = 100 * yields.pct_change().dropna()
 
             try:
-                # ARIMA Rate Path
+                # 1. ARIMA RATE FORECAST
                 model_arima = pm.auto_arima(yields, seasonal=False, suppress_warnings=True)
                 arima_fc = model_arima.predict(n_periods=horizon)
                 order = model_arima.order
                 
-                # GARCH Volatility Path
+                # 2. GARCH VOLATILITY FORECAST
                 garch = arch_model(returns, p=1, q=1, vol='Garch', dist='Normal')
                 res_garch = garch.fit(disp='off')
                 garch_fc = res_garch.forecast(horizon=horizon)
@@ -110,7 +108,7 @@ if run_btn:
                 # --- Tab 1: Rate Forecast ---
                 with tabs[0]:
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Actual", line=dict(color=DARK_BLUE)))
+                    fig.add_trace(go.Scatter(x=yields.index[-250:], y=yields.tail(250), name="Historical", line=dict(color=DARK_BLUE)))
                     f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
                     fig.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="ARIMA Forecast", line=dict(color="orange", dash='dot', width=3)))
                     fig.update_layout(title=f"ARIMA{order} Yield Projection", template="plotly_white")
@@ -128,17 +126,19 @@ if run_btn:
                 with tabs[2]:
                     mae = np.mean(np.abs(yields.tail(horizon).values - arima_fc[:len(yields.tail(horizon))].values))
                     st.metric("Model MAE (Last Period)", f"{mae:.4f}")
-                    st.info("Validation based on historical residual variance analysis.")
+                    st.info("Validation based on historical residual variance analysis and Box-Jenkins methodology.")
 
                 # --- Tab 4: Risk Metrics ---
                 with tabs[3]:
                     c1, c2, c3 = st.columns(3)
+                    # Convert to scalar floats to avoid formatting errors
                     curr = float(yields.iloc[-1])
                     pred = float(arima_fc.iloc[-1])
                     bps = (pred - curr) * 100
                     
-                    # Scalar conversion for VaR
-                    var_val = float(np.sqrt(garch_fc.variance.values[-1, 0]) * 1.645)
+                    # Scalar conversion for VaR calculation
+                    forecast_var = garch_fc.variance.values[-1, 0]
+                    var_val = float(np.sqrt(forecast_var) * 1.645)
                     
                     c1.metric("Current Spot", f"{curr:.3f}%")
                     c2.metric("Expected Move", f"{bps:+.1f} bps")
@@ -149,11 +149,11 @@ if run_btn:
                     st.header("🎓 The Quantitative Framework")
                     
                     st.markdown("""
-                    **Stage 1: ARIMA modeling** captures the historical mean-reversion and trend components of US Treasury rates.
+                    **Stage 1: ARIMA Modeling** Captures the linear momentum and trend components of the yield level.
                     
-                    **Stage 2: GARCH(1,1)** models 'Volatility Clustering', acknowledging that risk is not constant in financial markets.
+                    **Stage 2: GARCH(1,1)** Models 'Volatility Clustering', acknowledging that risk levels change over time.
                     
-                    **Link to Theory:** Refer to the *ARIMA Modeling Guide* for Stage 4 residual diagnostic procedures.
+                    **Practical Utility:** These combined models help Institutional ALM desks forecast interest rate risk and Value-at-Risk (VaR).
                     """)
 
             except Exception as e:
