@@ -269,3 +269,14 @@ This dashboard was developed as part of advanced financial risk management and f
 **Last Updated**: January 2025  
 **Version**: 1.0.0  
 **Status**: Production Ready for Educational Use
+
+# 🏦 Interest Rate Forecasting Dashboard (v1.1)
+## Dual-Engine: Yahoo Finance & Federal Reserve (FRED)
+
+**Developed by: Prof. V. Ravichandran**
+
+## 🚀 New in this Version
+- **FRED Integration**: Users can now input a FRED API Key to pull authoritative US economic data.
+- **Resilient Data Fetching**: Implemented progressive retry logic (5s, 10s, 20s) for Yahoo Finance.
+- **Streamlit 2026 Ready**: Updated all chart and table syntax to `width="stretch"`.
+- **Basis Point (bps) Engine**: Clearer metrics for bond market movements.
