@@ -24,7 +24,7 @@ except ImportError:
 warnings.filterwarnings("ignore")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. THEME & SIDEBAR DESIGN (Restored Design)
+# 1. THEME & SIDEBAR DESIGN
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="Institutional Risk & Yield Terminal", layout="wide")
 
@@ -38,10 +38,7 @@ st.markdown(f"""
         padding: 2rem; border-radius: 15px; color: white; text-align: center;
         margin-bottom: 2rem; border-bottom: 5px solid {GOLD};
     }}
-    /* Sidebar Background and Label Restoration */
-    [data-testid="stSidebar"] {{
-        background-color: {CORPORATE_BLUE} !important;
-    }}
+    [data-testid="stSidebar"] {{ background-color: {CORPORATE_BLUE} !important; }}
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label {{ 
         color: white !important; font-weight: bold; 
     }}
@@ -85,24 +82,23 @@ with tabs[0]:
 
 if run_btn:
     try:
-        # DATA FETCHING
         data = yf.Ticker(ticker).history(period=f"{lookback}y")
         if not data.empty:
             yields = data['Close'].resample('B').last().ffill()
             returns = 100 * yields.pct_change().dropna()
             f_dates = pd.date_range(yields.index[-1], periods=horizon+1, freq='B')[1:]
-            
+            config_summary = f"**Asset:** {ticker_label} | **Horizon:** {horizon}D"
+
             # MODEL ENGINES
             model_arima = pm.auto_arima(yields, seasonal=False)
             arima_fc = model_arima.predict(n_periods=horizon)
-            
             garch_fit = arch_model(returns, p=1, q=1, vol='Garch').fit(disp='off')
             cond_vol = np.sqrt(garch_fit.conditional_volatility**2 * 252)
 
-            # STOCHASTIC SIMULATION
             r0, kappa, theta, sigma = yields.iloc[-1]/100, 0.20, 0.045, 0.015
             dt, n_paths = 1/252, 1000
-            v_paths = np.zeros((n_paths, horizon)); c_paths = np.zeros((n_paths, horizon))
+            v_paths = np.zeros((n_paths, horizon))
+            c_paths = np.zeros((n_paths, horizon))
             v_paths[:, 0] = c_paths[:, 0] = r0
             
             for i in range(1, horizon):
@@ -111,40 +107,66 @@ if run_btn:
                 
             v_med = np.percentile(v_paths, 50, axis=0)*100
             c_med = np.percentile(c_paths, 50, axis=0)*100
-            
-            config_summary = f"**Asset:** {ticker_label} | **Horizon:** {horizon}D"
 
-            # POPULATE TABS
-            with tabs[1]:
+            # --- UPDATED TAB RENDERING (Using width='stretch') ---
+            with tabs[1]: # ARIMA
                 st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
                 fig_a = go.Figure()
                 fig_a.add_trace(go.Scatter(x=yields.index[-200:], y=yields.tail(200), name="Actual"))
                 fig_a.add_trace(go.Scatter(x=f_dates, y=arima_fc, name="Forecast", line=dict(dash='dot', color='orange')))
-                st.plotly_chart(fig_a, use_container_width=True)
+                st.plotly_chart(fig_a, width='stretch')
 
-            with tabs[3]: # Vasicek Path
+            with tabs[2]: # GARCH
                 st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
-                st.plotly_chart(go.Figure(go.Scatter(x=f_dates, y=v_med, name="Vasicek Path")), use_container_width=True)
+                fig_g = go.Figure(go.Scatter(x=cond_vol.index, y=cond_vol, line=dict(color='red')))
+                st.plotly_chart(fig_g, width='stretch')
+
+            with tabs[3]: # VASICEK
+                st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
+                fig_v = go.Figure(go.Scatter(x=f_dates, y=v_med, name="Vasicek Path"))
+                st.plotly_chart(fig_v, width='stretch')
+
+            with tabs[4]: # CIR
+                st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
+                fig_c = go.Figure(go.Scatter(x=f_dates, y=c_med, name="CIR Path", line=dict(color='green')))
+                st.plotly_chart(fig_c, width='stretch')
+
+            with tabs[5]: # BACKTEST
+                st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
+                train_bt, test_bt = yields.iloc[:-30], yields.iloc[-30:]
+                m_bt = pm.auto_arima(train_bt, seasonal=False).predict(n_periods=30)
+                fig_bt = go.Figure()
+                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=test_bt, name="Market Realized"))
+                fig_bt.add_trace(go.Scatter(x=test_bt.index, y=m_bt, name="Forecast", line=dict(dash='dash', color='orange')))
+                st.plotly_chart(fig_bt, width='stretch')
+
+            with tabs[6]: # DIAGNOSTICS
+                st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
+                st.plotly_chart(go.Figure(go.Scatter(y=model_arima.resid(), line=dict(color='gray'))), width='stretch')
+                
 
             with tabs[7]: # METRICS
                 st.markdown(f'<div class="config-info">{config_summary}</div>', unsafe_allow_html=True)
                 z = stats.norm.ppf(conf_level)
-                vol = garch_fit.conditional_volatility.iloc[-1]
-                var, es = vol * z, vol * (stats.norm.pdf(z)/(1-conf_level))
+                vol_now = garch_fit.conditional_volatility.iloc[-1]
+                var_calc, es_calc = vol_now * z, vol_now * (stats.norm.pdf(z)/(1-conf_level))
                 c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Spot", f"{yields.iloc[-1]:.3f}%"); c2.metric("Forecast", f"{arima_fc.iloc[-1]:.3f}%")
-                c3.metric("Daily VaR", f"{var:.3f}%"); c4.metric("Exp. Shortfall", f"{es:.3f}%")
+                c1.metric("Spot", f"{yields.iloc[-1]:.3f}%")
+                c2.metric("Forecast", f"{arima_fc.iloc[-1]:.3f}%")
+                c3.metric("Daily VaR", f"{var_calc:.3f}%")
+                c4.metric("Exp. Shortfall", f"{es_calc:.3f}%")
                 
 
             with tabs[8]: # EXPORT
+                st.subheader("📋 Institutional Quantitative Report")
                 export_df = pd.DataFrame({
                     "Date": f_dates.strftime('%Y-%m-%d'),
                     "ARIMA (%)": arima_fc.values.round(4),
                     "Vasicek (%)": v_med.round(4),
                     "CIR (%)": c_med.round(4)
                 })
-                st.dataframe(export_df.style.background_gradient(cmap='YlGnBu'), use_container_width=True)
-                st.download_button("📥 Download Quantitative Report", export_df.to_csv(index=False).encode('utf-8'), "Analysis.csv")
+                st.dataframe(export_df.style.background_gradient(cmap='YlGnBu'), width='stretch')
+                st.download_button("📥 Download Report", export_df.to_csv(index=False).encode('utf-8'), "Analysis.csv")
 
     except Exception as e:
         st.error(f"Computation Error: {e}")
