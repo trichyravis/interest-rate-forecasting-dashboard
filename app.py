@@ -13,7 +13,7 @@ from india_yield_fetcher import IntelligentYieldFetcher, CacheManager
 from yield_scheduler import YieldDataScheduler
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# INITIALIZATION
+# 1. INITIALIZATION (The Engine is already working in your logs!)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="Institutional Yield Terminal", layout="wide")
 
@@ -30,15 +30,18 @@ def init_institutional_engine():
 fetcher, scheduler = init_institutional_engine()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STYLING (FIXED TYPO HERE)
+# 2. UI BRANDING (CORRECTED TYPO)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
     <div style='background: linear-gradient(135deg, #003366 0%, #0066CC 100%); padding: 25px; border-radius: 15px; color: white; text-align: center;'>
         <h1 style='margin:0;'>INTEREST RATE ANALYTICS TERMINAL</h1>
         <p style='margin:0;'>The Mountain Path - World of Finance | Institutional Data Engine</p>
     </div>
-""", unsafe_allow_html=True) # Fixed parameter name
+""", unsafe_allow_html=True) # Fixed: changed from unsafe_allow_True
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. SIDEBAR (This will now reappear)
+# ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.header("📡 Live Data Feeds")
     benchmark = st.selectbox("Benchmark Instrument", ["India 10Y G-Sec", "US 10Y Treasury"])
@@ -55,44 +58,26 @@ with st.sidebar:
     run_btn = st.button("🚀 EXECUTE FORECAST")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ANALYTICS ENGINE
+# 4. DATA FETCHING & ARIMA
 # ═══════════════════════════════════════════════════════════════════════════════
 if run_btn:
     with st.spinner("Processing Multi-Source Data..."):
-        
-        # Data Acquisition
         if benchmark == "India 10Y G-Sec":
-            # Primary history for ARIMA modeling
             hist_data = yf.download("IN10Y.NS", period="5y", progress=False)['Close']
-            current_val, source = fetcher.fetch_yield(use_cache=True)
         else:
             hist_data = yf.download("^TNX", period="5y", progress=False)['Close']
 
         if not hist_data.empty:
             series = hist_data.dropna().resample('B').last().ffill()
-            
             try:
-                # Modeling using Box-Jenkins methodology
                 model = pm.auto_arima(series, seasonal=False, suppress_warnings=True)
                 forecast = model.predict(n_periods=horizon)
                 
-                # Visuals
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=series.index[-250:], y=series[-250:], name="Historical", line=dict(color="#003366")))
                 f_dates = pd.date_range(series.index[-1], periods=horizon+1, freq='B')[1:]
-                fig.add_trace(go.Scatter(x=f_dates, y=forecast, name="ARIMA Forecast", line=dict(color="orange", width=3)))
+                fig.add_trace(go.Scatter(x=f_dates, y=forecast, name="Forecast", line=dict(color="orange", width=3)))
                 
-                # Use new Streamlit 2026 syntax
                 st.plotly_chart(fig, width="stretch")
-                
-                # BPS Metrics
-                curr_y = series.iloc[-1]
-                fc_y = forecast.iloc[-1]
-                bps_move = (fc_y - curr_y) * 100
-                st.metric("Forecasted Movement", f"{bps_move:+.1f} bps", delta=f"{fc_y:.3f}%", delta_color="inverse")
-
             except Exception as e:
                 st.error(f"Modeling Error: {e}")
-
-st.markdown("---")
-st.info("💡 Review the 'Final Version ARIMA_Modeling.pdf' in the Hub for deep methodology insights.")
